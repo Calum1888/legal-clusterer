@@ -5,7 +5,6 @@ import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 from tqdm import tqdm
 import warnings
-from transformers import pipeline
 
 class DocumentClusterer():
     def __init__(self,
