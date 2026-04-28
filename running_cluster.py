@@ -1,5 +1,4 @@
 import json
-from document_clusterer import DocumentClusterer
 
 # data
 IN_FILE = "data/CUADv1.json"
@@ -33,16 +32,8 @@ clusterer = DocumentClusterer(
     dist_threshold=DISTANCE_THRESHOLD,
     linkage=LINKAGE,
     input_type=INPUT_TYPE,
-    random_state=RANDOM_STATE,
-    llm_model=LLM_MODEL,
-    n_llm_samples=N_LLM_SAMPLES,
-    prompt_type_of_doc=PROMPT_TYPE_OF_DOC
+    random_state=RANDOM_STATE
 )
 
 # cluster and give labels to clusters
 results = clusterer.fit(cuad_data)
-labels = clusterer.llm_cluster_label()
-print(labels)
-
-# error detection
-print(clusterer.error_detection(cluster_id=3, generated_labels=labels))
