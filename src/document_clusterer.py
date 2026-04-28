@@ -3,10 +3,9 @@ from scipy.sparse import csr_matrix
 from sklearn.decomposition import TruncatedSVD
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
-import ollama
 from tqdm import tqdm
 import warnings
-
+from transformers import pipeline
 
 class DocumentClusterer():
     def __init__(self,
@@ -18,6 +17,7 @@ class DocumentClusterer():
                 input_type: str,
                 random_state: int,
                 llm_model: str,
+                max_tokens: int,
                 n_llm_samples: int,
                 prompt_type_of_doc: str):
         
@@ -29,6 +29,7 @@ class DocumentClusterer():
         self.input_type = input_type
         self.random_state = random_state
         self.llm_model = llm_model
+        self.max_tokens = max_tokens
         self.n_llm_samples = n_llm_samples
         self.prompt_type_of_doc = prompt_type_of_doc
 
@@ -147,106 +148,8 @@ class DocumentClusterer():
         return dict(zip(self.doc_ids_, self.labels_))
     
 
-    def llm_cluster_label(self) -> dict:
-        """
-        Uses a locally running Ollama LLM to generate a human-readable label
-        for each cluster.
-
-        Groups document identifiers by their cluster label, then samples a user defined number of documents
-        per cluster and passes them to the configured Ollama
-        model to produce a short descriptive label. Requires fit() to have been
-        called first so that self.labels_ and self.doc_ids_ are populated.
-
-        Returns:
-            dict: A mapping of cluster_id (int) -> label (str), e.g.
-
-        Raises:
-            ValueError: If fit() has not been called and self.labels_ is None.
-        """
-        if self.labels_ is None:
-            raise ValueError('fit() must be called before llm_cluster_label().')
-
-        n_clusters = len(set(self.labels_))
     
-
-        if n_clusters > 30:
-            warnings.warn(
-                f'llm_cluster_label() will make {n_clusters} API calls to Ollama. '
-                f'This could take a while. '
-                f'Consider raising dist_threshold to reduce cluster count.',
-                UserWarning
-            )
-
-        clusters = {}
-        for doc_id, label in zip(self.doc_ids_, self.labels_):
-            clusters.setdefault(int(label), []).append(doc_id)
-
-        generated_cluster_labels = {}
-        for cluster_id, doc_ids in tqdm(clusters.items(), desc="Labelling clusters"):
-            sample = doc_ids[:self.n_llm_samples] #taking a sample from cluster to reduce time for llm call
-            prompt = (
-                f'These {self.prompt_type_of_doc} were grouped together by a '
-                'clustering algorithm:\n\n'
-                + '\n'.join(sample)
-                + '\n\nRespond with only a short 3-5 word label describing '
-                f'what {self.prompt_type_of_doc} these are. No explanation.'
-                )
-
-            response = ollama.chat(
-                model = self.llm_model,
-                messages = [{'role': 'user', 'content': prompt}]
-            )
-            generated_cluster_labels[cluster_id] = response.message.content.strip()
-
-        return generated_cluster_labels
     
-    def error_detection(self, cluster_id: int, generated_labels: dict) -> dict:
-        '''
-        Uses a locally running Ollama LLM to verify whether a specific cluster
-        is internally coherent.
-
-        Samples up to self.n_llm_samples document titles from the requested cluster
-        and asks the LLM whether they all belong to the same type, using the
-        cluster's generated label as context. Requires fit() and llm_cluster_label()
-        to have been called first.
-
-        Args:
-            cluster_id (int): The ID of the cluster to check.
-            generated_labels (dict): The output of llm_cluster_label(), mapping
-            cluster_id (int) -> label (str).
-
-        Returns:
-            dict: A dictionary with the following keys:
-            - 'cluster_id' (int): The cluster that was checked.
-            - 'label' (str): The generated label for that cluster.
-            - 'verdict' (str): The LLM's YES/NO response and one sentence explanation.
-        '''
-        cluster_label = generated_labels[cluster_id]
-
-        doc_titles = [
-            doc_id for doc_id, label in zip(self.doc_ids_, self.labels_)
-            if int(label) == cluster_id
-        ]
-        sample = doc_titles[:self.n_llm_samples]
-
-        checking_prompt = (
-            f'A clustering algorithm grouped these {self.prompt_type_of_doc} together '
-            f'and labelled the cluster: "{cluster_label}".\n\n'
-            + '\n'.join(sample)
-            + '\n\nDo these titles all belong to the same type? '
-            'Reply with YES or NO, then a one sentence explanation.'
-        )
-
-        response = ollama.chat(
-            model=self.llm_model,
-            messages=[{'role': 'user', 'content': checking_prompt}]
-        )
-
-        return {
-            'cluster_id': cluster_id,
-            'label': cluster_label,
-            'verdict': response.message.content.strip()
-        }
 
 
 
