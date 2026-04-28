@@ -15,11 +15,7 @@ class DocumentClusterer():
                 dist_threshold: float,
                 linkage: str,
                 input_type: str,
-                random_state: int,
-                llm_model: str,
-                max_tokens: int,
-                n_llm_samples: int,
-                prompt_type_of_doc: str):
+                random_state: int):
         
         self.ngram_range = ngram
         self.n_components = n_components
@@ -28,10 +24,6 @@ class DocumentClusterer():
         self.linkage = linkage
         self.input_type = input_type
         self.random_state = random_state
-        self.llm_model = llm_model
-        self.max_tokens = max_tokens
-        self.n_llm_samples = n_llm_samples
-        self.prompt_type_of_doc = prompt_type_of_doc
 
         self.tfidf_ = None
         self.svd_ = None
