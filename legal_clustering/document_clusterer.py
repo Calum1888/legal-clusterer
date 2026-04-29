@@ -13,6 +13,7 @@ class DocumentClusterer():
                 n_iter: int,
                 dist_threshold: float,
                 linkage: str,
+                metric: str,
                 input_type: str,
                 random_state: int):
         
@@ -21,6 +22,7 @@ class DocumentClusterer():
         self.n_iter = n_iter
         self.dist_threshold = dist_threshold
         self.linkage = linkage
+        self.metric = metric
         self.input_type = input_type
         self.random_state = random_state
 
@@ -113,7 +115,10 @@ class DocumentClusterer():
             different distance metric will raise a ValueError.
         """
     
-        model = AgglomerativeClustering(n_clusters=None, distance_threshold = self.dist_threshold , linkage = self.linkage)
+        model = AgglomerativeClustering(n_clusters=None,
+                                        metric=self.metric,
+                                        distance_threshold = self.dist_threshold ,
+                                        linkage = self.linkage)
         
         cluster_labels = model.fit_predict(freq_doc_matrix)
 
