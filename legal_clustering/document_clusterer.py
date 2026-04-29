@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 from tqdm import tqdm
 import warnings
+from sklearn.metrics import silhouette_score
 
 class DocumentClusterer():
     def __init__(self,
@@ -141,7 +142,14 @@ class DocumentClusterer():
         fdm = self.dim_reduction(tdm)
         self.labels_ = self.clusterer(fdm)
 
+        self.silhouette_ = silhouette_score(fdm, self.labels_, metric="cosine")
+        print(f"Silhouette Score: {self.silhouette_:.4f}")
+
         return dict(zip(self.doc_ids_, self.labels_))
+    
+    
+
+
     
 
     
