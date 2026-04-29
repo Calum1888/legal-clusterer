@@ -9,11 +9,12 @@ NGRAM_RANGE = (1,3)
 N_COMPONENTS = 100
 N_ITERATIONS = 7
 DISTANCE_THRESHOLD = 1.5
-LINKAGE = 'ward'
+LINKAGE = 'average'
+METRIC = 'cosine'
 INPUT_TYPE = 'content'
 RANDOM_STATE = 42
 LLM_MODEL = 'TinyLlama/TinyLlama-1.1B-Chat-v1.0'
-MAX_TOKENS = 50
+MAX_TOKENS = 100
 TOKEN_PRICE = 0.0001
 N_LLM_SAMPLES = 5
 PROMPT_TYPE_OF_DOC = 'legal contracts'
@@ -43,7 +44,7 @@ results = clusterer.fit(cuad_data)
 
 # define evaluator and share state from clusterer
 evaluator = LLMEvaluation(
-    llm_model=LLM_MODEL,  # HuggingFace model name
+    llm_model=LLM_MODEL,  
     max_tokens=MAX_TOKENS,
     token_price=TOKEN_PRICE,
     n_llm_samples=N_LLM_SAMPLES,
