@@ -8,7 +8,7 @@ IN_FILE = "data/CUADv1.json"
 NGRAM_RANGE = (1,3)
 N_COMPONENTS = 100
 N_ITERATIONS = 7
-DISTANCE_THRESHOLD = 1.5
+DISTANCE_THRESHOLD = 1.3
 LINKAGE = 'average'
 METRIC = 'cosine'
 INPUT_TYPE = 'content'
@@ -35,6 +35,7 @@ clusterer = DocumentClusterer(
     n_iter=N_ITERATIONS,
     dist_threshold=DISTANCE_THRESHOLD,
     linkage=LINKAGE,
+    metric=METRIC,
     input_type=INPUT_TYPE,
     random_state=RANDOM_STATE
 )
@@ -42,27 +43,6 @@ clusterer = DocumentClusterer(
 # cluster CUAD data
 results = clusterer.fit(cuad_data)
 
-# define evaluator and share state from clusterer
-evaluator = LLMEvaluation(
-    llm_model=LLM_MODEL,  
-    max_tokens=MAX_TOKENS,
-    token_price=TOKEN_PRICE,
-    n_llm_samples=N_LLM_SAMPLES,
-    prompt_type_of_doc=PROMPT_TYPE_OF_DOC,
-)
+print(len(set(clusterer.labels_)))
 
-# pass cluster state from clusterer to evaluator
-evaluator.doc_ids_ = clusterer.doc_ids_
-evaluator.labels_ = clusterer.labels_
 
-# generate labels for each cluster
-cluster_labels = evaluator.llm_label()
-print(cluster_labels)
-
-# check a specific cluster for coherence
-verdict = evaluator.error_detection(
-    cluster_id=0,
-    generated_labels=cluster_labels
-)
-print(verdict)
-print(evaluator.count_price_tokens())

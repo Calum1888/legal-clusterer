@@ -42,11 +42,12 @@ class LLMEvaluation:
 
     def llm_label(self, id_and_label: dict) -> dict:
         clusters = {}
-        for doc_id, label in zip(id_and_label):
+        for doc_id, label in id_and_label.items():
             clusters.setdefault(int(label), []).append(doc_id)
 
         generated_cluster_labels = {}
         for cluster_id, doc_ids in tqdm(clusters.items(), desc="Labelling clusters"):
+            random.seed(self.seed)
             sample = random.sample(doc_ids, min(self.n_llm_samples, len(doc_ids)))
             prompt = (
                 f"These {self.prompt_type_of_doc} were grouped together by a "
@@ -64,7 +65,7 @@ class LLMEvaluation:
         cluster_label = generated_labels[cluster_id]
 
         doc_titles = [
-            doc_id for doc_id, label in zip(id_and_label)
+            doc_id for doc_id, label in id_and_label.items()
             if int(label) == cluster_id
         ]
 

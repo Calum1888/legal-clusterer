@@ -6,6 +6,7 @@ from sklearn.cluster import AgglomerativeClustering
 from tqdm import tqdm
 import warnings
 from sklearn.metrics import silhouette_score
+from sklearn.preprocessing import normalizea
 
 class DocumentClusterer():
     def __init__(self,
@@ -92,6 +93,7 @@ class DocumentClusterer():
         
         # fdm is the frequency-document matrix
         self.fdm_ = self.svd_.fit_transform(term_doc_matrix)
+        self.fdm_ = normalize(self.fdm_, norm='l2')
 
         return self.fdm_
 
@@ -146,21 +148,3 @@ class DocumentClusterer():
         print(f"Silhouette Score: {self.silhouette_:.4f}")
 
         return dict(zip(self.doc_ids_, self.labels_))
-    
-    
-
-
-    
-
-    
-    
-
-
-
-        
-        
-
-
-
-
-
