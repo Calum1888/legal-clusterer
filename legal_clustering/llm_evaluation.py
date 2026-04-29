@@ -11,12 +11,14 @@ class LLMEvaluation:
         token_price: float,
         n_llm_samples: int,
         prompt_type_of_doc: str,
+        seed: int
     ):
         self.llm_model = llm_model
         self.max_tokens = max_tokens
         self.token_price = token_price
         self.n_llm_samples = n_llm_samples
         self.prompt_type_of_doc = prompt_type_of_doc
+        self.seed = seed
 
         self._build_pipeline()
 
@@ -28,7 +30,7 @@ class LLMEvaluation:
             device_map="auto",
             max_new_tokens=self.max_tokens,
             do_sample=True,
-            temperature=0.3,
+            temperature=0.3
         )
 
     def count_price_tokens(self, prompt: str) -> dict:
@@ -38,9 +40,9 @@ class LLMEvaluation:
             "price": num_tokens * self.token_price,
         }
 
-    def llm_label(self) -> dict:
+    def llm_label(self, id_and_label: dict) -> dict:
         clusters = {}
-        for doc_id, label in zip(self.doc_ids_, self.labels_):
+        for doc_id, label in zip(id_and_label):
             clusters.setdefault(int(label), []).append(doc_id)
 
         generated_cluster_labels = {}
@@ -53,18 +55,20 @@ class LLMEvaluation:
                 + "\n\nRespond with only a short 3-5 word label describing "
                 f"what {self.prompt_type_of_doc} these are. No explanation."
             )
-            response = self._hf_llm(prompt)[0]["generated_text"]
-            generated_cluster_labels[cluster_id] = response.split(prompt)[-1].strip()
+
+            generated_cluster_labels[cluster_id] = self._hf_llm(prompt)[0]["generated_text"].replace(prompt, "").strip()
 
         return generated_cluster_labels
 
-    def error_detection(self, cluster_id: int, generated_labels: dict) -> dict:
+    def error_detection(self, cluster_id: int, generated_labels: dict, id_and_label: dict) -> dict:
         cluster_label = generated_labels[cluster_id]
 
         doc_titles = [
-            doc_id for doc_id, label in zip(self.doc_ids_, self.labels_)
+            doc_id for doc_id, label in zip(id_and_label)
             if int(label) == cluster_id
         ]
+
+        random.seed(self.seed)
         sample = random.sample(doc_titles, min(self.n_llm_samples, len(doc_titles)))
 
         checking_prompt = (
@@ -74,8 +78,7 @@ class LLMEvaluation:
             + "\n\nDo these titles all belong to the same type? "
             "Reply with YES or NO, then a one sentence explanation."
         )
-        raw = self._hf_llm(checking_prompt)[0]["generated_text"]
-        verdict = raw.split(checking_prompt)[-1].strip()
+        verdict = self._hf_llm(checking_prompt)[0]["generated_text"].replace(checking_prompt, "").strip()
 
         return {
             "cluster_id": cluster_id,
