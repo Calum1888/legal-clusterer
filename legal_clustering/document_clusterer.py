@@ -6,7 +6,7 @@ from sklearn.cluster import AgglomerativeClustering
 from tqdm import tqdm
 import warnings
 from sklearn.metrics import silhouette_score
-from sklearn.preprocessing import normalizea
+from sklearn.preprocessing import normalize
 
 class DocumentClusterer():
     def __init__(self,
