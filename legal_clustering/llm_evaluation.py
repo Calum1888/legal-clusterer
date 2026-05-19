@@ -122,6 +122,20 @@ class LLMEvaluation:
             + f"\n\nDo these {self.prompt_type_of_doc} all belong to the same type? "
             "Reply with YES or NO on the first line, then a one sentence explanation."
         )
+    
+    def _batched_generate(self, prompts: list, desc: str) -> list:
+        """Generate responses for many prompts with a real progress bar."""
+        outputs = []
+        n = len(prompts)
+        for i in tqdm(range(0, n, self.batch_size), desc=desc):
+            batch = prompts[i : i + self.batch_size]
+            batch_outputs = self._hf_llm(
+                batch,
+                batch_size=self.batch_size,
+                return_full_text=False,
+            )
+            outputs.extend(batch_outputs)
+        return outputs
 
     def llm_label(
         self,
@@ -168,11 +182,7 @@ class LLMEvaluation:
 
         # Batched generation. return_full_text=False yields only the continuation,
         # avoiding fragile prompt-stripping logic.
-        outputs = list(tqdm(
-            self._hf_llm(prompts, batch_size=self.batch_size, return_full_text=False),
-            total=len(prompts),
-            desc="Labelling clusters",
-        ))
+        outputs = self._batched_generate(prompts, desc="Labelling clusters")
 
         # Zip outputs back to cluster IDs and clean up the labels.
         generated_cluster_labels = {}
@@ -266,11 +276,7 @@ class LLMEvaluation:
                 cluster_label, sample_ids, documents))
 
         # Batched generation across all clusters.
-        outputs = list(tqdm(
-            self._hf_llm(prompts, batch_size=self.batch_size, return_full_text=False),
-            total=len(prompts),
-            desc="Verifying clusters",
-        ))
+        outputs = self._batched_generate(prompts, desc="Verifying clusters")
 
         results = []
         for cluster_id, cluster_label, out in zip(cluster_ids, cluster_labels, outputs):
