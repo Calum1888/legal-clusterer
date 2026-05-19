@@ -6,9 +6,9 @@ IN_FILE = "data/CUADv1.json"
 
 # clustering parameters
 NGRAM_RANGE = (1,3)
-N_COMPONENTS = 100
+N_COMPONENTS = 200
 N_ITERATIONS = 7
-DISTANCE_THRESHOLD = 1.3
+DISTANCE_THRESHOLD = 0.9
 LINKAGE = 'average'
 METRIC = 'cosine'
 INPUT_TYPE = 'content'
