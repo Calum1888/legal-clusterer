@@ -2,10 +2,6 @@ from transformers import pipeline, AutoTokenizer
 from tqdm import tqdm
 import random
 
-from transformers import pipeline, AutoTokenizer
-from tqdm import tqdm
-import random
-
 
 class LLMEvaluation:
     def __init__(
@@ -168,7 +164,7 @@ class LLMEvaluation:
         for cluster_id, doc_ids in clusters.items():
             sample_ids = rng.sample(doc_ids, min(self.n_llm_samples, len(doc_ids)))
             cluster_ids.append(cluster_id)
-            prompts.append(self._build_label_prompt(sample_ids, documents, self.excerpt_chars))
+            prompts.append(self._build_label_prompt(sample_ids, documents))
 
         # Batched generation. return_full_text=False yields only the continuation,
         # avoiding fragile prompt-stripping logic.
@@ -221,7 +217,7 @@ class LLMEvaluation:
         rng = random.Random(self.seed)
         sample_ids = rng.sample(doc_ids, min(self.n_llm_samples, len(doc_ids)))
 
-        prompt = self._build_verification_prompt(cluster_label, sample_ids, documents, self.excerpt_chars)
+        prompt = self._build_verification_prompt(cluster_label, sample_ids, documents)
         raw_verdict = self._hf_llm(prompt, return_full_text=False)[0]["generated_text"].strip()
 
         first_token = raw_verdict.split()[0].upper().strip(".,:;") if raw_verdict else ""
@@ -267,8 +263,7 @@ class LLMEvaluation:
             cluster_ids.append(cluster_id)
             cluster_labels.append(cluster_label)
             prompts.append(self._build_verification_prompt(
-                cluster_label, sample_ids, documents, self.excerpt_chars
-            ))
+                cluster_label, sample_ids, documents))
 
         # Batched generation across all clusters.
         outputs = list(tqdm(
