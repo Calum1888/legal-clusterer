@@ -16,7 +16,9 @@ class LLMEvaluation:
         n_llm_samples: int,
         prompt_type_of_doc: str,
         seed: int,
-        batch_size: int = 8,
+        batch_size: int,
+        min_cluster_size: int,
+        excerpt_chars: int
     ):
         """
         Args:
@@ -37,6 +39,8 @@ class LLMEvaluation:
         self.prompt_type_of_doc = prompt_type_of_doc
         self.seed = seed
         self.batch_size = batch_size
+        self.min_cluster_size = min_cluster_size
+        self.excerpt_chars = excerpt_chars
 
         self._build_pipeline()
 
@@ -94,10 +98,10 @@ class LLMEvaluation:
             "price": num_tokens * self.token_price,
         }
 
-    def _build_label_prompt(self, sample_ids: list, documents: dict, excerpt_chars: int) -> str:
+    def _build_label_prompt(self, sample_ids: list, documents: dict) -> str:
         """Construct a prompt asking the LLM to label a cluster."""
         excerpts = [
-            f"--- {doc_id} ---\n{documents.get(doc_id, '')[:excerpt_chars].strip()}"
+            f"--- {doc_id} ---\n{documents.get(doc_id, '')[:self.excerpt_chars].strip()}"
             for doc_id in sample_ids
         ]
         return (
@@ -109,11 +113,10 @@ class LLMEvaluation:
         )
 
     def _build_verification_prompt(
-        self, cluster_label: str, sample_ids: list, documents: dict, excerpt_chars: int
-    ) -> str:
+        self, cluster_label: str, sample_ids: list, documents: dict) -> str:
         """Construct a prompt asking the LLM to verify a cluster's label."""
         excerpts = [
-            f"--- {doc_id} ---\n{documents.get(doc_id, '')[:excerpt_chars].strip()}"
+            f"--- {doc_id} ---\n{documents.get(doc_id, '')[:self.excerpt_chars].strip()}"
             for doc_id in sample_ids
         ]
         return (
@@ -127,10 +130,7 @@ class LLMEvaluation:
     def llm_label(
         self,
         id_and_label: dict,
-        documents: dict,
-        excerpt_chars: int = 1000,
-        min_cluster_size: int = 2,
-    ) -> dict:
+        documents: dict) -> dict:
         """
         Generate a short descriptive label for each cluster using the LLM.
 
@@ -157,7 +157,7 @@ class LLMEvaluation:
             clusters.setdefault(int(label), []).append(doc_id)
 
         # Skip clusters too small to label meaningfully.
-        clusters = {cid: ids for cid, ids in clusters.items() if len(ids) >= min_cluster_size}
+        clusters = {cid: ids for cid, ids in clusters.items() if len(ids) >= self.min_cluster_size}
 
         # Single RNG, seeded once — no global state pollution, samples vary per cluster.
         rng = random.Random(self.seed)
@@ -168,7 +168,7 @@ class LLMEvaluation:
         for cluster_id, doc_ids in clusters.items():
             sample_ids = rng.sample(doc_ids, min(self.n_llm_samples, len(doc_ids)))
             cluster_ids.append(cluster_id)
-            prompts.append(self._build_label_prompt(sample_ids, documents, excerpt_chars))
+            prompts.append(self._build_label_prompt(sample_ids, documents, self.excerpt_chars))
 
         # Batched generation. return_full_text=False yields only the continuation,
         # avoiding fragile prompt-stripping logic.
@@ -193,9 +193,7 @@ class LLMEvaluation:
         cluster_id: int,
         generated_labels: dict,
         id_and_label: dict,
-        documents: dict,
-        excerpt_chars: int = 1000,
-    ) -> dict:
+        documents: dict) -> dict:
         """
         Verify a single cluster: ask the LLM whether its documents genuinely
         belong together under the generated label.
@@ -223,7 +221,7 @@ class LLMEvaluation:
         rng = random.Random(self.seed)
         sample_ids = rng.sample(doc_ids, min(self.n_llm_samples, len(doc_ids)))
 
-        prompt = self._build_verification_prompt(cluster_label, sample_ids, documents, excerpt_chars)
+        prompt = self._build_verification_prompt(cluster_label, sample_ids, documents, self.excerpt_chars)
         raw_verdict = self._hf_llm(prompt, return_full_text=False)[0]["generated_text"].strip()
 
         first_token = raw_verdict.split()[0].upper().strip(".,:;") if raw_verdict else ""
@@ -238,9 +236,7 @@ class LLMEvaluation:
         self,
         generated_labels: dict,
         id_and_label: dict,
-        documents: dict,
-        excerpt_chars: int = 1000,
-    ) -> list:
+        documents: dict) -> list:
         """
         Run cluster verification over every labelled cluster, batching prompts
         through the LLM for speed.
@@ -271,7 +267,7 @@ class LLMEvaluation:
             cluster_ids.append(cluster_id)
             cluster_labels.append(cluster_label)
             prompts.append(self._build_verification_prompt(
-                cluster_label, sample_ids, documents, excerpt_chars
+                cluster_label, sample_ids, documents, self.excerpt_chars
             ))
 
         # Batched generation across all clusters.
