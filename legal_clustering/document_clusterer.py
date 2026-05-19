@@ -144,6 +144,7 @@ class DocumentClusterer():
         tdm = self.tfidf_vectorizer(documents)
         fdm = self.dim_reduction(tdm)
         self.labels_ = self.clusterer(fdm)
+        self.labels_ = [int(l) for l in self.labels_]
         sizes = Counter(self.labels_)
 
         self.silhouette_ = silhouette_score(fdm, self.labels_, metric="cosine")
