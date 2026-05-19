@@ -93,7 +93,7 @@ Each class follows the same shape: parameters set in `__init__`, an explicit per
 - `tqdm`
 
 ```bash
-pip install scikit-learn scipy numpy sentence-transformers transformers torch tqdm
+pip install -r requirements.txt
 ```
 
 A CUDA-enabled GPU is strongly recommended for the LLM stages; everything runs on CPU but slowly.
