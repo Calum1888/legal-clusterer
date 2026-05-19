@@ -1,4 +1,7 @@
 import json
+
+from collections import Counter
+
 from legal_clustering import DocumentClusterer, LLMEvaluation
 
 # data
@@ -6,11 +9,11 @@ IN_FILE = "data/CUADv1.json"
 
 # clustering parameters
 NGRAM_RANGE = (1,3)
-N_COMPONENTS = 200
+N_COMPONENTS = 100
 N_ITERATIONS = 7
-DISTANCE_THRESHOLD = 0.9
-LINKAGE = 'average'
-METRIC = 'cosine'
+DISTANCE_THRESHOLD = 1.5
+LINKAGE = 'ward'
+METRIC = 'euclidean'
 INPUT_TYPE = 'content'
 RANDOM_STATE = 42
 LLM_MODEL = 'TinyLlama/TinyLlama-1.1B-Chat-v1.0'
@@ -29,6 +32,7 @@ cuad_data = {
 }
 
 # define clusterer
+
 clusterer = DocumentClusterer(
     ngram=NGRAM_RANGE,
     n_components=N_COMPONENTS,
@@ -42,7 +46,5 @@ clusterer = DocumentClusterer(
 
 # cluster CUAD data
 results = clusterer.fit(cuad_data)
-
-print(len(set(clusterer.labels_)))
 
 
