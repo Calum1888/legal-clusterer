@@ -1,17 +1,15 @@
 import json
 
-from collections import Counter
-
-from legal_clustering import DocumentClusterer, LLMEvaluation, LLMClusterer
+from legal_clustering import DocumentClusterer, LLMEvaluation, EmbeddingClusterer
 
 # data
 IN_FILE = "data/CUADv1.json"
 
 # clustering parameters
 NGRAM_RANGE = (1,3)
-N_COMPONENTS = 100
+N_COMPONENTS = 50
 N_ITERATIONS = 7
-DISTANCE_THRESHOLD = 1.5
+DISTANCE_THRESHOLD = 2.5
 LINKAGE = 'ward'
 METRIC = 'euclidean'
 INPUT_TYPE = 'content'
@@ -77,6 +75,9 @@ llm_clusterer = LLMClusterer(
 
 # cluster CUAD data
 results = clusterer.fit(cuad_data)
+
+# cluster CUAD data with LLMClusterer
+emb_results = llm_clusterer.fit(cuad_data)
 
 # llm labels
 labels = llm_eval.llm_label(results, cuad_data)
