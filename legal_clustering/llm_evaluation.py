@@ -124,17 +124,15 @@ class LLMEvaluation:
         )
     
     def _batched_generate(self, prompts: list, desc: str) -> list:
-        """Generate responses for many prompts with a real progress bar."""
         outputs = []
-        n = len(prompts)
-        for i in tqdm(range(0, n, self.batch_size), desc=desc):
-            batch = prompts[i : i + self.batch_size]
-            batch_outputs = self._hf_llm(
-                batch,
-                batch_size=self.batch_size,
-                return_full_text=False,
-            )
-            outputs.extend(batch_outputs)
+        with tqdm(total=len(prompts), desc=desc) as pbar:
+            for i in range(0, len(prompts), self.batch_size):
+                batch = prompts[i : i + self.batch_size]
+                batch_outputs = self._hf_llm(
+                    batch, batch_size=self.batch_size, return_full_text=False,
+                )
+                outputs.extend(batch_outputs)
+                pbar.update(len(batch))
         return outputs
 
     def llm_label(
