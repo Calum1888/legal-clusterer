@@ -7,6 +7,7 @@ from tqdm import tqdm
 import warnings
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import normalize
+from collections import Counter
 
 class DocumentClusterer():
     def __init__(self,
@@ -143,8 +144,15 @@ class DocumentClusterer():
         tdm = self.tfidf_vectorizer(documents)
         fdm = self.dim_reduction(tdm)
         self.labels_ = self.clusterer(fdm)
+        sizes = Counter(self.labels_)
 
         self.silhouette_ = silhouette_score(fdm, self.labels_, metric="cosine")
+
+        # useful metrics
         print(f"Silhouette Score: {self.silhouette_:.4f}")
+        print(f"Number of Cluster Labels: {len(set(self.labels_))}")
+        print(f"Most Common Cluster Size: {sizes.most_common(10)}") 
+        print(f"Number of Singletons: {sum(1 for c in sizes.values() if c == 1)}")
+        print(f"Largest Cluster: {max(sizes.values())} documents, Smallest Cluster: {min(sizes.values())} documents")
 
         return dict(zip(self.doc_ids_, self.labels_))
