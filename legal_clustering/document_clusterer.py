@@ -150,9 +150,9 @@ class DocumentClusterer():
 
         # useful metrics
         print(f"Silhouette Score: {self.silhouette_:.4f}")
-        print(f"Number of Cluster Labels: {len(set(self.labels_)):.4f}")
-        print(f"Most Common Cluster Size: {sizes.most_common(10):.4f}") 
-        print(f"Number of Singletons: {sum(1 for c in sizes.values() if c == 1):.4f}")
-        print(f"Largest Cluster: {max(sizes.values()):.4f} documents, Smallest Cluster: {min(sizes.values()):.4f} documents")
+        print(f"Number of Cluster Labels: {len(set(self.labels_))}")
+        print(f"Most Common Cluster Size: {sizes.most_common(10)}") 
+        print(f"Number of Singletons: {sum(1 for c in sizes.values() if c == 1)}")
+        print(f"Largest Cluster: {max(sizes.values())} documents, Smallest Cluster: {min(sizes.values())} documents")
 
         return dict(zip(self.doc_ids_, self.labels_))
