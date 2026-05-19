@@ -47,4 +47,10 @@ clusterer = DocumentClusterer(
 # cluster CUAD data
 results = clusterer.fit(cuad_data)
 
-
+llm_eval = LLMEvaluation(
+    llm_model=LLM_MODEL,
+    max_tokens=MAX_TOKENS,
+    n_llm_samples=N_LLM_SAMPLES,
+    prompt_type_of_doc=PROMPT_TYPE_OF_DOC,
+    seed=RANDOM_STATE
+)
