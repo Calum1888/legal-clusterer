@@ -160,9 +160,3 @@ verdicts = llm_eval.evaluate_all(labels, results, documents)
 
 ---
 
-## What I'd do next
-
-- Compute external metrics (ARI, AMI, V-measure) against CUAD's ground-truth contract types for a sharper comparison than silhouette.
-- Add long-context embeddings (`jinaai/jina-embeddings-v2-base-en`, 8k tokens) — current 2000-char truncation loses material in longer contracts.
-- Replace TinyLlama with a 7B-class model and re-measure verdict quality. The current self-verification is a useful skeleton; a stronger judge would make it actionable.
-- Cache embeddings to disk so the embedding clusterer doesn't re-encode on every threshold sweep.
