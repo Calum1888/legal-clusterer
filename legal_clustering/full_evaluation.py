@@ -12,32 +12,38 @@ from sklearn.metrics import (
 
 # Known CUAD contract types, ordered longest-first so multi-word types
 # match before their substrings (e.g. "ServiceAgreement" before "Agreement").
+# legal_clustering/evaluation.py
+
 CUAD_CONTRACT_TYPES = [
-    "AffiliateAgreement",
-    "CoBrandingAgreement",
-    "DevelopmentAgreement",
-    "DistributorAgreement",
-    "EndorsementAgreement",
-    "FranchiseAgreement",
-    "HostingAgreement",
-    "IPAgreement",
-    "JointVentureAgreement",
-    "LicenseAgreement",
-    "MaintenanceAgreement",
-    "ManufacturingAgreement",
-    "MarketingAgreement",
-    "NonCompeteAgreement",
-    "OutsourcingAgreement",
-    "PromotionAgreement",
-    "ReSellerAgreement",
-    "ServiceAgreement",
-    "SponsorshipAgreement",
-    "StrategicAlliance",
-    "SupplyAgreement",
-    "TransportationAgreement",
-    "ConsultingAgreement",
-    "AgencyAgreement",
-    "OperatingAgreement",
+    # Multi-word types first so they win over shorter substrings.
+    # Format: canonical name -> match patterns (all lowercase, no spaces/punct)
+    ("StrategicAlliance",        ["strategicalliance"]),
+    ("JointVenture",             ["jointventure"]),
+    ("CoBranding",               ["cobranding", "co-branding"]),
+    ("IntellectualProperty",     ["intellectualproperty"]),
+    ("NonCompete",               ["noncompete", "non-compete"]),
+    ("JointFiling",              ["jointfiling"]),
+    ("Remarketing",              ["remarketing"]),
+    ("Distributor",              ["distributor", "distribution"]),
+    ("License",                  ["license", "licensing", "licence"]),
+    ("Hosting",                  ["hosting"]),
+    ("Endorsement",              ["endorsement"]),
+    ("Franchise",                ["franchise"]),
+    ("Sponsorship",              ["sponsorship"]),
+    ("Supply",                   ["supply"]),
+    ("Consulting",               ["consulting"]),
+    ("Promotion",                ["promotion"]),
+    ("Affiliate",                ["affiliate"]),
+    ("Marketing",                ["marketing"]),
+    ("Maintenance",              ["maintenance"]),
+    ("Manufacturing",            ["manufacturing"]),
+    ("Outsourcing",              ["outsourcing"]),
+    ("Reseller",                 ["reseller"]),
+    ("Service",                  ["service"]),
+    ("Transportation",           ["transportation"]),
+    ("Agency",                   ["agency"]),
+    ("Operating",                ["operating"]),
+    ("Development",              ["development"]),
 ]
 
 
@@ -45,23 +51,18 @@ def extract_contract_type(title: str) -> str:
     """
     Extract the contract type from a CUAD filename.
 
-    CUAD titles follow the pattern '{Party}_{ContractType}.pdf'. We match
-    against the known list of CUAD types rather than blindly parsing the
-    filename, which handles variants like '_LicenseAgreement1' or
-    '_License_Agreement' (mixed separators).
-
-    Args:
-        title: Original document title from the CUAD JSON.
-
-    Returns:
-        The contract type as a string, or 'Unknown' if no match found.
+    CUAD titles vary wildly in format — some use underscores, some spaces,
+    some have dates and exhibit numbers embedded. The contract type usually
+    appears at the end. We normalise to lowercase alphanumeric only and
+    match against known type substrings in priority order.
     """
-    cleaned = title.replace(".pdf", "").replace(".PDF", "").replace("_", "")
-    # Match in declared order (longest types first) so 'ServiceAgreement'
-    # wins over 'Agreement'.
-    for contract_type in CUAD_CONTRACT_TYPES:
-        if contract_type.lower() in cleaned.lower():
-            return contract_type
+    cleaned = re.sub(r"[^a-z0-9]", "", title.lower())
+
+    for canonical, patterns in CUAD_CONTRACT_TYPES:
+        for pattern in patterns:
+            normalised_pattern = re.sub(r"[^a-z0-9]", "", pattern)
+            if normalised_pattern in cleaned:
+                return canonical
     return "Unknown"
 
 

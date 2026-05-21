@@ -3,13 +3,39 @@ from scipy.sparse import csr_matrix
 from sklearn.decomposition import TruncatedSVD
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
-from tqdm import tqdm
-import warnings
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import normalize
 from collections import Counter
 
 class DocumentClusterer():
+    """
+    Cluster documents using a classical bag-of-words pipeline.
+
+    The pipeline runs in three stages:
+        1. TF-IDF vectorisation turns raw text into a sparse term-document
+           matrix weighted by inverse document frequency.
+        2. Truncated SVD (Latent Semantic Analysis) projects that sparse
+           matrix into a dense, lower-dimensional space that captures the
+           dominant semantic axes and discards noise.
+        3. Agglomerative (hierarchical) clustering merges documents
+           bottom-up until the linkage distance exceeds dist_threshold.
+
+    This pipeline is fast, fully reproducible given a random_state, and
+    works well when documents are distinguished by distinctive vocabulary
+    (e.g. legal contracts where "license", "franchise", "supply" carry
+    strong signal). It is a weaker fit when documents share vocabulary
+    but differ in meaning, which is where dense sentence embeddings tend
+    to win.
+
+    Attributes set by `fit`:
+        tfidf_ (TfidfVectorizer): The fitted TF-IDF vectoriser.
+        tdm_ (csr_matrix): The sparse term-document matrix.
+        svd_ (TruncatedSVD): The fitted SVD reducer.
+        fdm_ (np.ndarray): The L2-normalised reduced document matrix.
+        labels_ (list[int]): Cluster label per document, aligned to doc_ids_.
+        doc_ids_ (list): Document identifiers in the order they were fitted.
+        silhouette_ (float): Cosine silhouette score over the reduced space.
+    """
     def __init__(self,
                 ngram: tuple,
                 n_components: int,
@@ -147,7 +173,7 @@ class DocumentClusterer():
         self.labels_ = [int(l) for l in self.labels_]
         sizes = Counter(self.labels_)
 
-        self.silhouette_ = silhouette_score(fdm, self.labels_, metric="cosine")
+        self.silhouette_ = silhouette_score(fdm, self.labels_, metric=self.metric)
 
         # useful metrics
         print(f"Silhouette Score: {self.silhouette_:.4f}")

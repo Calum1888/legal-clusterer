@@ -1,14 +1,44 @@
 from sentence_transformers import SentenceTransformer
 import numpy as np
-
-from sentence_transformers import SentenceTransformer
-import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import silhouette_score
 from collections import Counter
 
 
 class EmbeddingClusterer:
+    """
+    Cluster documents using dense sentence embeddings and agglomerative
+    clustering.
+
+    The pipeline runs in two stages:
+        1. A pre-trained sentence-transformer model encodes each document
+           into a dense semantic vector. Documents are truncated to
+           max_chars before encoding to stay within the model's context
+           window (typically ~512 tokens / ~2000 chars).
+        2. Agglomerative (hierarchical) clustering merges documents
+           bottom-up until the linkage distance exceeds dist_threshold.
+
+    Embeddings are L2-normalised at encode time. This means Euclidean
+    distance on the output is monotonically related to cosine distance,
+    so "ward" linkage with "euclidean" metric behaves equivalently to
+    cosine-based clustering and is the recommended default.
+
+    This pipeline tends to outperform classical TF-IDF when documents
+    use varied vocabulary to express similar concepts, but truncation
+    means it effectively clusters on document openings rather than full
+    content — important for long documents like legal contracts, where
+    titles, parties, and recitals often (but not always) carry the most
+    class signal.
+
+    Attributes set by `fit`:
+        embeddings_ (np.ndarray): Dense matrix of L2-normalised
+            embeddings, shape (n_documents, embedding_dim).
+        labels_ (list[int]): Cluster label per document, aligned to doc_ids_.
+        doc_ids_ (list): Document identifiers in the order they were fitted.
+        silhouette_ (float): Cosine silhouette score over the embeddings.
+        _encoder (SentenceTransformer): The loaded encoder, lazily
+            initialised on the first call to `embed`.
+    """
     def __init__(
         self,
         embedding_model: str,
@@ -121,7 +151,7 @@ class EmbeddingClusterer:
         self.labels_ = [int(l) for l in raw_labels]
         sizes = Counter(self.labels_)
 
-        self.silhouette_ = silhouette_score(embeddings, self.labels_, metric="cosine")
+        self.silhouette_ = silhouette_score(embeddings, self.labels_, metric=self.metric)
 
         # Diagnostics
         print(f"Silhouette Score: {self.silhouette_:.4f}")
