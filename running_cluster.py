@@ -28,7 +28,7 @@ EXCERPT_CHARAS = 800
 
 # LLM clustering parameters
 EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
-DISTANCE_THRESHOLD_EMB = 1.5
+DISTANCE_THRESHOLD_EMB = 2.5
 MAX_CHARS = 2000
 
 # read in data 
