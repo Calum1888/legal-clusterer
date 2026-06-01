@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import silhouette_score
 from collections import Counter
+from .sweep import select_k_by_silhouette
 
 
 class EmbeddingClusterer:
@@ -48,6 +49,8 @@ class EmbeddingClusterer:
         max_chars: int,
         batch_size: int,
         random_state: int,
+        k_min: int = 2,
+        k_max: int = None
     ):
         """
         Cluster documents using dense sentence embeddings + agglomerative clustering.
@@ -70,11 +73,14 @@ class EmbeddingClusterer:
         self.batch_size = batch_size
         self.random_state = random_state
         self.max_chars = max_chars
+        self.k_min = k_min
+        self.k_max = k_max
 
         self.embeddings_ = None
         self.labels_ = None
         self.doc_ids_ = None
         self._encoder = None
+        self.selected_k_ = None
 
     def embed(self, documents: dict) -> np.ndarray:
         """
@@ -124,12 +130,19 @@ class EmbeddingClusterer:
             are L2-normalised, Euclidean distance here is equivalent to cosine
             up to a monotonic transform, so ward works well.
         """
+        if self.dist_threshold is None:
+            res = select_k_by_silhouette(
+                embeddings, linkage=self.linkage, metric=self.metric,
+                k_min=self.k_min, k_max=self.k_max,
+            )
+            self.selected_k_ = res["k"]
+            return res["labels"]
+        
         model = AgglomerativeClustering(
-            n_clusters=None,
-            metric=self.metric,
-            distance_threshold=self.dist_threshold,
-            linkage=self.linkage,
+            n_clusters=None, metric=self.metric,
+            distance_threshold=self.dist_threshold, linkage=self.linkage,
         )
+        
         return model.fit_predict(embeddings)
 
     def fit(self, documents: dict) -> dict:

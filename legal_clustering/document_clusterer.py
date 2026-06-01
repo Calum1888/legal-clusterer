@@ -6,6 +6,7 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import normalize
 from collections import Counter
+from .sweep import select_k_by_silhouette
 
 class DocumentClusterer():
     """
@@ -44,7 +45,9 @@ class DocumentClusterer():
                 linkage: str,
                 metric: str,
                 input_type: str,
-                random_state: int):
+                random_state: int,
+                k_min: int = 2,
+                k_max: int = None):
         
         self.ngram_range = ngram
         self.n_components = n_components
@@ -54,11 +57,14 @@ class DocumentClusterer():
         self.metric = metric
         self.input_type = input_type
         self.random_state = random_state
+        self.k_min = k_min
+        self.k_max = k_max
 
         self.tfidf_ = None
         self.svd_ = None
         self.labels_ = None
         self.doc_ids_ = None
+        self.selected_k_ = None
 
     def tfidf_vectorizer(self, documents: dict) -> csr_matrix:
         """
@@ -145,14 +151,20 @@ class DocumentClusterer():
             different distance metric will raise a ValueError.
         """
     
-        model = AgglomerativeClustering(n_clusters=None,
-                                        metric=self.metric,
-                                        distance_threshold = self.dist_threshold ,
-                                        linkage = self.linkage)
+        if self.dist_threshold is None:
+            res = select_k_by_silhouette(
+                freq_doc_matrix, linkage=self.linkage, metric=self.metric,
+                k_min=self.k_min, k_max=self.k_max,
+            )
+            self.selected_k_ = res["k"]
+            return res["labels"]
         
-        cluster_labels = model.fit_predict(freq_doc_matrix)
-
-        return cluster_labels
+        model = AgglomerativeClustering(
+            n_clusters=None, metric=self.metric,
+            distance_threshold=self.dist_threshold, linkage=self.linkage,
+        )
+        
+        return model.fit_predict(freq_doc_matrix)
     
     def fit(self, documents: dict) -> dict:
         """
