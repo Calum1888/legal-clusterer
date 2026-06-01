@@ -60,13 +60,13 @@ def _build_clusterer(method: str, random_state: int):
     if method == "embeddings":
         return EmbeddingClusterer(
             embedding_model="sentence-transformers/all-mpnet-base-v2",
-            dist_threshold=0.9, linkage="ward", metric="euclidean",
+            dist_threshold=None, linkage="ward", metric="euclidean",   # None = adaptive
             max_chars=2000, batch_size=32, random_state=random_state,
         )
     if method == "tfidf":
         return DocumentClusterer(
             ngram=(1, 2), n_components=200, n_iter=10,
-            dist_threshold=1.2, linkage="ward", metric="euclidean",
+            dist_threshold=None, linkage="ward", metric="euclidean",   # None = adaptive
             input_type="content", random_state=random_state,
         )
     raise ValueError(f"method must be 'embeddings' or 'tfidf', got {method!r}")
