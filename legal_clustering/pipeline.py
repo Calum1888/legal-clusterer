@@ -17,10 +17,10 @@ from collections import defaultdict
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
-from legal_clustering.document_clusterer import DocumentClusterer
-from legal_clustering.embedding_clusterer import EmbeddingClusterer
-from legal_clustering.llm_evaluation import LLMEvaluation
-from legal_clustering.validation import (
+from .document_clusterer import DocumentClusterer
+from .embedding_clusterer import EmbeddingClusterer
+from .llm_evaluation import LLMEvaluation
+from .validation import (
     CorpusError,
     MIN_DOCUMENTS,
     MAX_DOCUMENTS,
