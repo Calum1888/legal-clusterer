@@ -20,6 +20,13 @@ from typing import Optional
 from legal_clustering.document_clusterer import DocumentClusterer
 from legal_clustering.embedding_clusterer import EmbeddingClusterer
 from legal_clustering.llm_evaluation import LLMEvaluation
+from legal_clustering.validation import (
+    CorpusError,
+    MIN_DOCUMENTS,
+    MAX_DOCUMENTS,
+    validate_corpus,
+    is_degenerate_clustering_error,
+)
 
 
 @dataclass
@@ -65,6 +72,26 @@ def _build_clusterer(method: str, random_state: int):
     raise ValueError(f"method must be 'embeddings' or 'tfidf', got {method!r}")
 
 
+def _fit_or_explain(clusterer, documents: dict) -> dict:
+    """
+    Run clusterer.fit, translating the single-cluster failure into a
+    user-facing CorpusError. The clusterers compute a silhouette score inside
+    fit(), which scikit-learn refuses to do when everything lands in one
+    cluster; that surfaces here as a clean message instead of a stack trace.
+    """
+    try:
+        return clusterer.fit(documents)
+    except ValueError as exc:
+        if is_degenerate_clustering_error(exc):
+            raise CorpusError(
+                "The documents were too similar to separate into distinct "
+                "groups — clustering placed them all together. This usually "
+                "means the collection is too small or too uniform to cluster. "
+                "Try a larger or more varied set of documents."
+            ) from exc
+        raise
+
+
 def cluster_documents(
     documents: dict[str, str],
     doc_type: str = "documents",
@@ -74,6 +101,8 @@ def cluster_documents(
     clusterer=None,
     llm=None,
     random_state: int = 42,
+    min_documents: int = MIN_DOCUMENTS,
+    max_documents: int = MAX_DOCUMENTS,
 ) -> ClusteringResult:
     """
     Cluster a collection of documents and (optionally) label each cluster.
@@ -93,16 +122,25 @@ def cluster_documents(
         llm: Optional pre-built LLMEvaluation (dependency injection for tests).
             If None and label_clusters is True, one is built with TinyLlama.
         random_state: Seed passed through to the clusterer.
+        min_documents: Reject corpora smaller than this (see validation).
+        max_documents: Reject corpora larger than this (see validation).
 
     Returns:
         ClusteringResult with the silhouette, cluster count, and one Cluster
         per group (every cluster is present; small ones simply have label=None).
+
+    Raises:
+        CorpusError: If the corpus is too small, too large, or too uniform to
+            separate into more than one cluster. Messages are user-safe.
     """
     if clusterer is None:
         clusterer = _build_clusterer(method, random_state)
 
+    # Guard the corpus size before doing any expensive work.
+    validate_corpus(documents, min_documents, max_documents)
+
     # fit() returns {doc_id -> cluster_id} and sets clusterer.silhouette_.
-    id_to_cluster: dict[str, int] = clusterer.fit(documents)
+    id_to_cluster: dict[str, int] = _fit_or_explain(clusterer, documents)
 
     # Group doc_ids by cluster so every cluster appears in the output,
     # including the small ones the LLM step will skip.
