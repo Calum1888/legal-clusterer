@@ -2,13 +2,8 @@
 Ingestion layer: turn an uploaded archive of files into the
 `{doc_id -> text}` dict that `cluster_documents` expects.
 
-Supports .txt, .md, .pdf, and .docx. Anything else (images, spreadsheets,
-junk like __MACOSX/ or .DS_Store) is skipped rather than crashing the run.
-Files that extract to empty/whitespace are dropped too, since they carry no
-clustering signal.
-
-This module handles per-file extraction. Corpus-level guards (too few / too
-many documents to cluster) live in the size/quality checks (step 3), not here.
+Supports .txt, .md, .pdf, and .docx. Anything else is skipped rather than crashing the run.
+Files that extract to empty/whitespace are dropped too, since they carry no text for clustering.
 """
 
 from __future__ import annotations
@@ -22,33 +17,72 @@ import pdfplumber
 from docx import Document as DocxDocument
 
 
-# Extensions we know how to read. Everything else is skipped.
+# extensions we can read (text, mardown, pdfs, word docs)
 SUPPORTED = {".txt", ".md", ".pdf", ".docx"}
 
 
 class UnsupportedFileError(ValueError):
-    """Raised when asked to extract a file type we don't handle."""
+    """
+    Raised when asked to extract a file type we don't handle.
+    """
 
 
 def _extract_txt(data: bytes) -> str:
-    # Try UTF-8 first; fall back to a permissive decode rather than erroring
-    # on the occasional mis-encoded byte.
+    '''
+    Extracts text from the ingested text files and converts to a string.
+
+    Args:
+        data (bytes): data from ingested text files to be decoded.
+    
+    Returns:
+        str: string of text from the ingested text file.
+    '''
+    # try UTF-8 
     try:
         return data.decode("utf-8")
+    # fall back to a permissive decode rather than erroring
+    # replace charatcters that can not be read and keep everywhere else  
     except UnicodeDecodeError:
         return data.decode("utf-8", errors="replace")
 
 
 def _extract_pdf(data: bytes) -> str:
+    '''
+    Extracts test from ingeted pdf files and converts to a string using 
+    pdfplumber.  
+
+    Args:
+        data (bytes): data from ingested pdf file.
+
+    Returns:
+        str: A string of the pdf text content.
+    '''
     parts: list[str] = []
+    # opens data as a pdf
+    # io.BytesIO treats raw bytes from zip file as an open file 
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         for page in pdf.pages:
+            # for each page, extract text from that page
+            # add it to storage, parts
             parts.append(page.extract_text() or "")
+    # return pdf content with pages joined by new lines
     return "\n".join(parts)
 
 
 def _extract_docx(data: bytes) -> str:
+    '''
+    Extract data from ingested docx file and converts to a string.
+    
+    Args:
+        data (bytes): data from docx file
+    
+    Returns:
+        str: A string of the docx's text content.
+    '''
+    # opens docx 
+    # io.BytesIO treats raw bytes from zip file as an open file
     doc = DocxDocument(io.BytesIO(data))
+    # for each paragraph, join the raw text together with new lines
     return "\n".join(p.text for p in doc.paragraphs)
 
 
@@ -58,7 +92,6 @@ _EXTRACTORS = {
     ".pdf": _extract_pdf,
     ".docx": _extract_docx,
 }
-
 
 def extract_text(filename: str, data: bytes) -> str:
     """
@@ -74,15 +107,20 @@ def extract_text(filename: str, data: bytes) -> str:
     Raises:
         UnsupportedFileError: If the extension isn't in SUPPORTED.
     """
+    # get file extension (.txt, .pdf, .md, .docx)
     ext = Path(filename).suffix.lower()
+    # matches extension to the extractor functions in _EXTRACTORS
     extractor = _EXTRACTORS.get(ext)
-    if extractor is None:
+    if extractor is None: 
         raise UnsupportedFileError(f"unsupported file type: {ext or '(none)'}")
+    # runs the correct extractor on the data
     return extractor(data)
 
 
 def _is_junk(name: str) -> bool:
-    """Skip directories, macOS resource forks, and hidden files."""
+    """
+    Skip directories, macOS resource forks, and hidden files.
+    """
     base = os.path.basename(name)
     return (
         name.endswith("/")
@@ -107,28 +145,38 @@ def load_documents_from_zip(zip_source) -> dict[str, str]:
     Raises:
         zipfile.BadZipFile: If the archive can't be read as a zip.
     """
+    # converts input to file-like object to be opened by zipfile.ZipFile
     if isinstance(zip_source, (bytes, bytearray)):
         zip_source = io.BytesIO(zip_source)
 
+    # storgae for accepted/skipped documents 
     documents: dict[str, str] = {}
     skipped: list[str] = []
 
     with zipfile.ZipFile(zip_source) as zf:
+        
         for info in zf.infolist():
             name = info.filename
+            # drops folder entries and junk
             if info.is_dir() or _is_junk(name):
                 continue
+            # skip document if extension is not supported 
             if Path(name).suffix.lower() not in SUPPORTED:
+                # add to skipped storage
                 skipped.append(name)
                 continue
 
             data = zf.read(name)
             try:
+                # extract text
                 text = extract_text(name, data).strip()
-            except Exception as exc:  # noqa: BLE001 - one bad file shouldn't kill the batch
+
+            # if extraction fails for whatever reason, skip do not crash    
+            except Exception as exc: 
                 skipped.append(f"{name} (extraction failed: {exc})")
                 continue
-
+            
+            # if not text then skip, i.e images etc. 
             if not text:
                 skipped.append(f"{name} (empty)")
                 continue
@@ -141,7 +189,9 @@ def load_documents_from_zip(zip_source) -> dict[str, str]:
             documents[doc_id] = text
 
     if skipped:
+        # print amount that were skipped and first 10 files names that are skipped
         print(f"Skipped {len(skipped)} file(s): {skipped[:10]}"
               + (" ..." if len(skipped) > 10 else ""))
 
+    # return accepted files
     return documents
