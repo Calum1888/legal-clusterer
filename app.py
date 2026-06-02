@@ -48,25 +48,28 @@ def _render(result) -> str:
     return "\n\n".join(blocks)
 
 
-def handle(file_path, doc_type, method, label_clusters):
-    """Top-level handler: ingest, cluster, render, with user-safe errors."""
+def handle(file_path, doc_type, method, label_clusters, progress=gr.Progress()):
     if not file_path:
         return "Please upload a .zip containing your documents."
 
+    progress(0.1, desc="Reading zip…")
     try:
         documents = load_documents_from_zip(file_path)
     except Exception:
         return "That file couldn't be read as a .zip archive."
 
+    progress(0.3, desc="Clustering…")
     try:
         result = _cluster(documents, doc_type or "documents", method, label_clusters)
     except CorpusError as e:
-        return str(e)                       # expected, user-safe failures
-    except Exception:
-        return "Something went wrong while clustering. Try a different collection."
+        return str(e)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()                      
+        return f"Something went wrong while clustering: {e}"
 
+    progress(1.0, desc="Done")
     return _render(result)
-
 
 with gr.Blocks(title="Document Clusterer") as demo:
     gr.Markdown(
