@@ -70,11 +70,11 @@ class LLMEvaluation:
         """
         self._tokenizer = AutoTokenizer.from_pretrained(self.llm_model)
 
-        # Decoder-only models often lack a pad token; reuse EOS for padding.
+        # decoder-only models often lack a pad token; reuse EOS for padding.
         if self._tokenizer.pad_token is None:
             self._tokenizer.pad_token = self._tokenizer.eos_token
 
-        # Left-padding is required for batched generation with decoder-only models.
+        # left-padding is required for batched generation with decoder-only models.
         self._tokenizer.padding_side = "left"
 
         self._hf_llm = pipeline(
@@ -87,7 +87,11 @@ class LLMEvaluation:
         )
 
     def count_price_tokens(self, prompt: str) -> dict:
-        """Return the token count and cost of a single prompt."""
+        """
+        Return the token count and cost of a single prompt.
+
+        Will probably be removed in future updates.
+        """
         num_tokens = len(self._tokenizer.encode(prompt))
         return {
             "number_of_tokens": num_tokens,
@@ -95,11 +99,23 @@ class LLMEvaluation:
         }
 
     def _build_label_prompt(self, sample_ids: list, documents: dict) -> str:
-        """Construct a prompt asking the LLM to label a cluster."""
+        """
+        Construct a prompt asking the LLM to label a cluster.
+
+        Args:
+            sample_ids (list): A list of sampled document ids from a clsuter.
+            documents (dict): Collection of documents.
+        
+        Returns:
+            str: A prompt used to label each cluster.
+        """
+        # have a doc_id header between documents
+        # strip the first N characters from the document to be used as context in LLM 
         excerpts = [
             f"--- {doc_id} ---\n{documents.get(doc_id, '')[:self.excerpt_chars].strip()}"
             for doc_id in sample_ids
         ]
+        # returns the full prompt
         return (
             f"These {self.prompt_type_of_doc} were grouped together by a "
             "clustering algorithm:\n\n"
@@ -110,7 +126,17 @@ class LLMEvaluation:
 
     def _build_verification_prompt(
         self, cluster_label: str, sample_ids: list, documents: dict) -> str:
-        """Construct a prompt asking the LLM to verify a cluster's label."""
+        """
+        Construct a prompt asking the LLM to verify a cluster's label.
+
+        Args:
+            cluster_label (str): The LLM-generated label for a sepcific cluster.
+            sample_ids (list): A list of sampled document ids from a clsuter.
+            documents (dict): Collection of documents.
+        
+        Returns:
+            str: A prompt to verify if the LLM-label is accurate to the content of the documents.
+        """
         excerpts = [
             f"--- {doc_id} ---\n{documents.get(doc_id, '')[:self.excerpt_chars].strip()}"
             for doc_id in sample_ids
@@ -124,14 +150,32 @@ class LLMEvaluation:
         )
     
     def _batched_generate(self, prompts: list, desc: str) -> list:
+        '''
+        Batches prompts together for the LLM to run over in parallel to speed up analysis.
+        
+        A progress bar is included if running localling in terminal.
+        A time/progress bar will be included on the API.
+
+        Args:
+            prompts (list): The prompts generated for clustering labels and the verfication.
+            desc (str): Label shown on progress bar.
+
+        Return:
+            list: The outputs from the LLM.
+        '''
+        # storage for LLM outputs
         outputs = []
+        # defines progress bar 
         with tqdm(total=len(prompts), desc=desc) as pbar:
             for i in range(0, len(prompts), self.batch_size):
+                # input batched prompts to the LLM model 
                 batch = prompts[i : i + self.batch_size]
                 batch_outputs = self._hf_llm(
                     batch, batch_size=self.batch_size, return_full_text=False,
                 )
+                # add LLM output to storage
                 outputs.extend(batch_outputs)
+                # increase length on progress bar
                 pbar.update(len(batch))
         return outputs
 
@@ -159,18 +203,18 @@ class LLMEvaluation:
         Returns:
             Mapping of cluster_id -> generated label string.
         """
-        # Group doc_ids by cluster, normalising numpy ints to Python ints.
+        # group doc_ids by cluster, normalising numpy ints to Python ints.
         clusters = {}
         for doc_id, label in id_and_label.items():
             clusters.setdefault(int(label), []).append(doc_id)
 
-        # Skip clusters too small to label meaningfully.
+        # kkip clusters too small to label meaningfully.
         clusters = {cid: ids for cid, ids in clusters.items() if len(ids) >= self.min_cluster_size}
 
-        # Single RNG, seeded once — no global state pollution, samples vary per cluster.
+        # single RNG, seeded once — no global state pollution, samples vary per cluster.
         rng = random.Random(self.seed)
 
-        # Build all prompts up front so they can be batched.
+        # build all prompts up front so they can be batched.
         cluster_ids = []
         prompts = []
         for cluster_id, doc_ids in clusters.items():
@@ -178,15 +222,15 @@ class LLMEvaluation:
             cluster_ids.append(cluster_id)
             prompts.append(self._build_label_prompt(sample_ids, documents))
 
-        # Batched generation. return_full_text=False yields only the continuation,
+        # batched generation. return_full_text=False yields only the continuation,
         # avoiding fragile prompt-stripping logic.
         outputs = self._batched_generate(prompts, desc="Labelling clusters")
 
-        # Zip outputs back to cluster IDs and clean up the labels.
+        # zip outputs back to cluster IDs and clean up the labels.
         generated_cluster_labels = {}
         for cluster_id, out in zip(cluster_ids, outputs):
             text = out[0]["generated_text"].strip()
-            # Hard cap on label length in case the model ignores the instruction.
+            # hard cap on label length in case the model ignores the instruction.
             label = " ".join(text.split()[:8])
             generated_cluster_labels[cluster_id] = label
 
