@@ -1,3 +1,14 @@
+---
+title: Document Clusterer
+emoji: 🗂️
+colorFrom: blue
+colorTo: indigo
+sdk: gradio
+sdk_version: 4.44.0
+app_file: app.py
+pinned: false
+---
+
 # Legal Document Clustering: Classical vs Neural Approaches
 
 A comparative study of two unsupervised clustering pipelines for legal contracts, evaluated on the [CUAD](https://www.atticusprojectai.org/cuad) dataset (510 commercial contracts across 25 contract types). The project benchmarks a classical TF-IDF + LSA pipeline against modern sentence-transformer embeddings, evaluates both with internal and external metrics, and uses a small open-source LLM to automatically label and verify the resulting clusters.
