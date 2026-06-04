@@ -27,7 +27,7 @@ except ImportError:
 
 
 
-@gpu(duration=120)
+@gpu(duration=300)
 def _cluster(documents, doc_type, method, label_clusters):
     """GPU-bound work: embedding + clustering + LLM labelling."""
     return cluster_documents(
