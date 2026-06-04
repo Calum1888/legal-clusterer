@@ -5,8 +5,10 @@ Run locally with `python app.py`, in a container via the Dockerfile, or as a
 Hugging Face Gradio-SDK Space (which is also where ZeroGPU is available).
 """
 
-import gradio as gr
 import spaces
+
+import gradio as gr
+
 
 from legal_clustering.ingestion import load_documents_from_zip
 from legal_clustering.pipeline import cluster_documents
