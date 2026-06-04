@@ -6,6 +6,7 @@ Hugging Face Gradio-SDK Space (which is also where ZeroGPU is available).
 """
 
 import gradio as gr
+import spaces
 
 from legal_clustering.ingestion import load_documents_from_zip
 from legal_clustering.pipeline import cluster_documents
@@ -18,11 +19,15 @@ try:
     import spaces
     gpu = spaces.GPU
 except ImportError:
-    def gpu(fn=None, **_):
-        return fn if fn is not None else (lambda f: f)
+    def gpu(*args, **kwargs):
+        # Used either as @gpu or @gpu(duration=...); handle both.
+        if args and callable(args[0]):
+            return args[0]                 # bare @gpu
+        return lambda fn: fn               # @gpu(duration=...)
 
 
-@gpu
+
+@gpu(duration=120)
 def _cluster(documents, doc_type, method, label_clusters):
     """GPU-bound work: embedding + clustering + LLM labelling."""
     return cluster_documents(
