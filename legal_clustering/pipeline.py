@@ -103,6 +103,7 @@ def cluster_documents(
     random_state: int = 42,
     min_documents: int = MIN_DOCUMENTS,
     max_documents: int = MAX_DOCUMENTS,
+    progress = None
 ) -> ClusteringResult:
     """
     Cluster a collection of documents and (optionally) label each cluster.
@@ -136,14 +137,12 @@ def cluster_documents(
     if clusterer is None:
         clusterer = _build_clusterer(method, random_state)
 
-    # Guard the corpus size before doing any expensive work.
-    validate_corpus(documents, min_documents, max_documents)
+    if progress is not None:
+        progress(0.35, desc="Embedding & clustering…")
 
-    # fit() returns {doc_id -> cluster_id} and sets clusterer.silhouette_.
+    validate_corpus(documents, min_documents, max_documents)
     id_to_cluster: dict[str, int] = _fit_or_explain(clusterer, documents)
 
-    # Group doc_ids by cluster so every cluster appears in the output,
-    # including the small ones the LLM step will skip.
     members_by_cluster: dict[int, list[str]] = defaultdict(list)
     for doc_id, cid in id_to_cluster.items():
         members_by_cluster[int(cid)].append(doc_id)
@@ -159,9 +158,13 @@ def cluster_documents(
                 prompt_type_of_doc=doc_type, seed=random_state,
                 batch_size=8, min_cluster_size=2, excerpt_chars=500,
             )
-        # llm_label only returns labels for clusters >= min_cluster_size.
-        labels = llm.llm_label(id_to_cluster, documents)
-        verdicts = llm.evaluate_all(labels, id_to_cluster, documents)
+        if progress is not None:
+            progress(0.5, desc="Labelling clusters…")
+        labels = llm.llm_label(id_to_cluster, documents, progress=progress)
+
+        if progress is not None:
+            progress(0.8, desc="Verifying labels…")
+        verdicts = llm.evaluate_all(labels, id_to_cluster, documents, progress=progress)
         verdicts_by_cluster = {v["cluster_id"]: v for v in verdicts}
 
     clusters: list[Cluster] = []

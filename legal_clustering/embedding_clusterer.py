@@ -50,7 +50,8 @@ class EmbeddingClusterer:
         batch_size: int,
         random_state: int,
         k_min: int = 2,
-        k_max: int = None
+        k_max: int = None,
+        encoder = None
     ):
         """
         Cluster documents using dense sentence embeddings + agglomerative clustering.
@@ -81,6 +82,7 @@ class EmbeddingClusterer:
         self.doc_ids_ = None
         self._encoder = None
         self.selected_k_ = None
+        self._encoder = encoder
 
     def embed(self, documents: dict) -> np.ndarray:
         """

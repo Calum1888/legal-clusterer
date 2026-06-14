@@ -14,7 +14,9 @@ class LLMEvaluation:
         seed: int,
         batch_size: int,
         min_cluster_size: int,
-        excerpt_chars: int
+        excerpt_chars: int,
+        hf_llm=None,
+        tokenizer=None,
     ):
         """
         Args:
@@ -38,7 +40,11 @@ class LLMEvaluation:
         self.min_cluster_size = min_cluster_size
         self.excerpt_chars = excerpt_chars
 
-        self._build_pipeline()
+        if hf_llm is not None and tokenizer is not None:
+            self._tokenizer = tokenizer
+            self._hf_llm = hf_llm
+        else:
+            self._build_pipeline()
 
     def _build_pipeline(self):
         """
@@ -149,40 +155,39 @@ class LLMEvaluation:
             "Reply with YES or NO on the first line, then a one sentence explanation."
         )
     
-    def _batched_generate(self, prompts: list, desc: str) -> list:
+    def _batched_generate(self, prompts: list, desc: str, progress=None) -> list:
         '''
         Batches prompts together for the LLM to run over in parallel to speed up analysis.
-        
-        A progress bar is included if running localling in terminal.
-        A time/progress bar will be included on the API.
+
+        A progress bar is shown: gr.Progress in the browser when `progress` is
+        supplied (Gradio), otherwise a tqdm bar in the terminal.
 
         Args:
-            prompts (list): The prompts generated for clustering labels and the verfication.
-            desc (str): Label shown on progress bar.
+            prompts (list): The prompts generated for cluster labels and verification.
+            desc (str): Label shown on the progress bar.
+            progress: Optional gradio.Progress; if given, the bar renders in the UI.
 
         Return:
             list: The outputs from the LLM.
         '''
-        # storage for LLM outputs
         outputs = []
-        # defines progress bar 
-        with tqdm(total=len(prompts), desc=desc) as pbar:
-            for i in range(0, len(prompts), self.batch_size):
-                # input batched prompts to the LLM model 
-                batch = prompts[i : i + self.batch_size]
-                batch_outputs = self._hf_llm(
-                    batch, batch_size=self.batch_size, return_full_text=False,
-                )
-                # add LLM output to storage
-                outputs.extend(batch_outputs)
-                # increase length on progress bar
-                pbar.update(len(batch))
+        # gr.Progress exposes .tqdm with the same interface as tqdm, so we just
+        # pick which iterator wrapper to use. Both render a live, moving bar.
+        starts = range(0, len(prompts), self.batch_size)
+        bar = progress.tqdm(starts, desc=desc) if progress is not None else tqdm(starts, desc=desc)
+        for i in bar:
+            batch = prompts[i : i + self.batch_size]
+            batch_outputs = self._hf_llm(
+                batch, batch_size=self.batch_size, return_full_text=False,
+            )
+            outputs.extend(batch_outputs)
         return outputs
 
     def llm_label(
         self,
         id_and_label: dict,
-        documents: dict) -> dict:
+        documents: dict,
+        progress = None) -> dict:
         """
         Generate a short descriptive label for each cluster using the LLM.
 
@@ -224,7 +229,7 @@ class LLMEvaluation:
 
         # batched generation. return_full_text=False yields only the continuation,
         # avoiding fragile prompt-stripping logic.
-        outputs = self._batched_generate(prompts, desc="Labelling clusters")
+        outputs = self._batched_generate(prompts, desc="Labelling clusters", progress=progress)
 
         # zip outputs back to cluster IDs and clean up the labels.
         generated_cluster_labels = {}
@@ -284,7 +289,8 @@ class LLMEvaluation:
         self,
         generated_labels: dict,
         id_and_label: dict,
-        documents: dict) -> list:
+        documents: dict,
+        progress = None) -> list:
         """
         Run cluster verification over every labelled cluster, batching prompts
         through the LLM for speed.
@@ -318,7 +324,7 @@ class LLMEvaluation:
                 cluster_label, sample_ids, documents))
 
         # Batched generation across all clusters.
-        outputs = self._batched_generate(prompts, desc="Verifying clusters")
+        outputs = self._batched_generate(prompts, desc="Verifying clusters", progress=progress)
 
         results = []
         for cluster_id, cluster_label, out in zip(cluster_ids, cluster_labels, outputs):
