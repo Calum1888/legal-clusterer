@@ -1,5 +1,41 @@
-.venv/
-*.pyc
+# Byte-compiled / optimized / DLL files
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging / build
+build/
+dist/
 *.egg-info/
+*.egg
 .eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Test & coverage caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local environment / secrets (never commit tokens)
+.env
+*.local
