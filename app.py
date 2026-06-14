@@ -1,39 +1,81 @@
 """
 Gradio app: upload a zip of documents, get back labelled clusters.
 
-Run locally with `python app.py`, in a container via the Dockerfile, or as a
-Hugging Face Gradio-SDK Space (which is also where ZeroGPU is available).
+Deployed as a Docker Space on CPU. The models are loaded once at startup and
+reused on every request (no GPU, no per-request reload, no scheduling layer).
 """
 
-import spaces
-
+import torch
 import gradio as gr
-
+from sentence_transformers import SentenceTransformer
+from transformers import pipeline, AutoTokenizer
 
 from legal_clustering.ingestion import load_documents_from_zip
 from legal_clustering.pipeline import cluster_documents
 from legal_clustering.validation import CorpusError
-
-# ZeroGPU: the heavy compute function must be decorated with @spaces.GPU so the
-# Space requests a GPU only while it runs. The `spaces` package only exists on
-# ZeroGPU, so fall back to a no-op decorator for local / Docker runs.
-try:
-    import spaces
-    gpu = spaces.GPU
-except ImportError:
-    def gpu(*args, **kwargs):
-        # Used either as @gpu or @gpu(duration=...); handle both.
-        if args and callable(args[0]):
-            return args[0]                 # bare @gpu
-        return lambda fn: fn               # @gpu(duration=...)
+from legal_clustering.embedding_clusterer import EmbeddingClusterer
+from legal_clustering.llm_evaluation import LLMEvaluation
 
 
+EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
+LLM_MODEL = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
 
-@gpu(duration=300)
+# CPU-only deployment. These guards still resolve correctly if the same file is
+# ever run on a GPU box, but on this Space they select CPU.
+_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+_PIPE_DEVICE = 0 if torch.cuda.is_available() else -1
+
+# ---------------------------------------------------------------------------
+# Load the heavy models ONCE at startup and reuse them on every request.
+# On CPU there's no process fork, so these are plain module-level singletons:
+# the first user request pays nothing because loading happened at boot, and the
+# Dockerfile bakes the weights into the image for a fast, offline cold start.
+# ---------------------------------------------------------------------------
+_ENCODER = SentenceTransformer(EMBEDDING_MODEL, device=_DEVICE)
+
+_TOKENIZER = AutoTokenizer.from_pretrained(LLM_MODEL)
+# decoder-only models often ship no pad token; reuse EOS so batching works.
+if _TOKENIZER.pad_token is None:
+    _TOKENIZER.pad_token = _TOKENIZER.eos_token
+# left-padding is required for batched generation with decoder-only models:
+# right-padding makes them continue from pad tokens and emit garbage.
+_TOKENIZER.padding_side = "left"
+
+_LLM_PIPE = pipeline(
+    task="text-generation",
+    model=LLM_MODEL,
+    tokenizer=_TOKENIZER,
+    device=_PIPE_DEVICE,
+    max_new_tokens=50,
+    do_sample=False,   # greedy -> reproducible labels/verdicts
+)
+
+
 def _cluster(documents, doc_type, method, label_clusters):
-    """GPU-bound work: embedding + clustering + LLM labelling."""
+    """Embedding + clustering + LLM labelling, reusing the module-level models."""
+    # Embeddings path reuses the shared encoder; the tfidf path is pure-CPU
+    # scikit-learn, so we let the pipeline build it (clusterer=None).
+    clusterer = None
+    if method == "embeddings":
+        clusterer = EmbeddingClusterer(
+            embedding_model=EMBEDDING_MODEL,
+            dist_threshold=None, linkage="ward", metric="euclidean",  # None = adaptive
+            max_chars=2000, batch_size=32, random_state=42,
+            encoder=_ENCODER,                        # inject pre-loaded model
+        )
+
+    llm = None
+    if label_clusters:
+        llm = LLMEvaluation(
+            llm_model=LLM_MODEL, max_tokens=50, token_price=0.0, n_llm_samples=3,
+            prompt_type_of_doc=doc_type, seed=42, batch_size=8,
+            min_cluster_size=2, excerpt_chars=500,
+            hf_llm=_LLM_PIPE, tokenizer=_TOKENIZER,   # inject pre-loaded model
+        )
+
     return cluster_documents(
-        documents, doc_type=doc_type, method=method, label_clusters=label_clusters,
+        documents, doc_type=doc_type, method=method,
+        label_clusters=label_clusters, clusterer=clusterer, llm=llm,
     )
 
 
@@ -59,42 +101,43 @@ def handle(file_path, doc_type, method, label_clusters, progress=gr.Progress()):
     if not file_path:
         return "Please upload a .zip containing your documents."
 
-    progress(0.1, desc="Reading zip…")
+    progress(0.1, desc="Reading zip\u2026")
     try:
         documents = load_documents_from_zip(file_path)
     except Exception:
         return "That file couldn't be read as a .zip archive."
 
-    progress(0.3, desc="Clustering…")
+    progress(0.3, desc="Clustering\u2026")
     try:
         result = _cluster(documents, doc_type or "documents", method, label_clusters)
     except CorpusError as e:
         return str(e)
     except Exception as e:
         import traceback
-        traceback.print_exc()                      
+        traceback.print_exc()
         return f"Something went wrong while clustering: {e}"
 
     progress(1.0, desc="Done")
     return _render(result)
 
+
 with gr.Blocks(title="Document Clusterer") as demo:
     gr.Markdown(
         "# Document Clusterer\n"
-        "Upload a **.zip** folder of documents (`.txt`, `.md`, `.pdf`, `.docx`) and get "
-        "them grouped into labelled clusters."
+        "Upload a **.zip** of documents (`.txt`, `.md`, `.pdf`, `.docx`) and get "
+        "them grouped into labelled clusters \u2014 no cloud API, all local models."
     )
     with gr.Row():
         with gr.Column(scale=1):
-            file_in = gr.File(label="Documents", file_types=[".zip"], type="filepath")
+            file_in = gr.File(label="Documents (.zip)", file_types=[".zip"], type="filepath")
             doc_type = gr.Textbox(
                 label="What kind of documents are these?",
                 placeholder="e.g. legal contracts, support tickets, news articles",
-                value="",
+                value="documents",
             )
             method = gr.Radio(
                 ["embeddings", "tfidf"], value="embeddings", label="Method",
-                info="Embeddings = semantic (slower); TF-IDF = keyword-based (faster)",
+                info="embeddings = semantic (slower); tfidf = keyword-based (faster)",
             )
             label = gr.Checkbox(value=True, label="Generate cluster labels (uses the LLM)")
             run = gr.Button("Cluster", variant="primary")
