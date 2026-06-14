@@ -81,20 +81,20 @@ def handle(file_path, doc_type, method, label_clusters, progress=gr.Progress()):
 with gr.Blocks(title="Document Clusterer") as demo:
     gr.Markdown(
         "# Document Clusterer\n"
-        "Upload a **.zip** of documents (`.txt`, `.md`, `.pdf`, `.docx`) and get "
-        "them grouped into labelled clusters \u2014 no cloud API, all local models."
+        "Upload a **.zip** folder of documents (`.txt`, `.md`, `.pdf`, `.docx`) and get "
+        "them grouped into labelled clusters."
     )
     with gr.Row():
         with gr.Column(scale=1):
-            file_in = gr.File(label="Documents (.zip)", file_types=[".zip"], type="filepath")
+            file_in = gr.File(label="Documents", file_types=[".zip"], type="filepath")
             doc_type = gr.Textbox(
                 label="What kind of documents are these?",
                 placeholder="e.g. legal contracts, support tickets, news articles",
-                value="documents",
+                value="",
             )
             method = gr.Radio(
                 ["embeddings", "tfidf"], value="embeddings", label="Method",
-                info="embeddings = semantic (slower); tfidf = keyword-based (faster)",
+                info="Embeddings = semantic (slower); TF-IDF = keyword-based (faster)",
             )
             label = gr.Checkbox(value=True, label="Generate cluster labels (uses the LLM)")
             run = gr.Button("Cluster", variant="primary")

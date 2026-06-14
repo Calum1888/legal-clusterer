@@ -1,11 +1,12 @@
 ---
 title: Document Clusterer
 emoji: 🗂️
-colorFrom: blue
-colorTo: indigo
+colorFrom: indigo
+colorTo: blue
 sdk: gradio
-sdk_version: 5.9.1
+sdk_version: 5.38.0   # pin a current 5.x; must be ≥5.12.0 to avoid the older token bug
 app_file: app.py
+python_version: "3.11"
 pinned: false
 ---
 
