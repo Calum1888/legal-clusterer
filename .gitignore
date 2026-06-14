@@ -38,4 +38,4 @@ Thumbs.db
 
 # Local environment / secrets (never commit tokens)
 .env
-*.local
+*.local*.zip
