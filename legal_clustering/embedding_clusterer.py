@@ -163,7 +163,7 @@ class EmbeddingClusterer:
         raw_labels = self.clusterer(embeddings)
 
         # Normalise numpy ints to Python ints once, at the source.
-        self.labels_ = [int(l) for l in raw_labels]
+        self.labels_ = [int(i) for i in raw_labels]
         sizes = Counter(self.labels_)
 
         self.silhouette_ = silhouette_score(embeddings, self.labels_, metric=self.metric)
