@@ -1,30 +1,7 @@
----
-title: Document Clusterer
-emoji: 🗂️
-colorFrom: indigo
-colorTo: blue
-sdk: docker
-app_port: 7860
-pinned: false
----
+# Legal Clusterer
 
-# Document Clusterer
+![CI](https://github.com/Calum1888/legal-clusterer/actions/workflows/ci.yml/badge.svg)
 
-Upload a `.zip` of documents (`.txt`, `.md`, `.pdf`, `.docx`) and get them grouped
-into labelled clusters — entirely with local models, no cloud API.
+**🔗 Live demo:** [Document Clusterer on Hugging Face Spaces](https://huggingface.co/spaces/Calum1888/DocumentClusterer)
 
-- **Embeddings** method: sentence-transformer (`all-mpnet-base-v2`) + agglomerative
-  clustering. Semantic, slower.
-- **TF-IDF** method: TF-IDF + LSA (Truncated SVD) + agglomerative clustering.
-  Keyword-based, faster.
-- Each cluster is labelled and verified by a small local LLM
-  (`TinyLlama-1.1B-Chat`).
-
-Runs CPU-only in a self-contained Docker image, with the model weights baked in
-at build time for a fast, offline cold start.
-
-The full methodology — a classical-vs-neural comparison on the CUAD contract
-corpus, with internal/external metrics and the reasoning behind each design
-choice — lives in the GitHub repo:
-
-**→ https://github.com/Calum1888/legal-clusterer**
+> An unsupervised NLP pipeline that clusters documents
