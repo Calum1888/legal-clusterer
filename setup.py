@@ -11,7 +11,7 @@ setup(
         "numpy>=1.24",
         "scipy>=1.10",
         "tqdm>=4.65",
-        "pypdf>=6.60",
+        "pypdf>=4.0",
         "python-docx>=1.1",
         "accelerate>=0.26",
     ],
