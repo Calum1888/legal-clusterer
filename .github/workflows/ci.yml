@@ -66,6 +66,6 @@ jobs:
           # so the token never appears in the command line / logs.
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          huggingface-cli upload Calum1888/DocumentClusterer ./staging . \
+          hf upload Calum1888/DocumentClusterer ./staging . \
             --repo-type=space \
             --commit-message "Deploy from GitHub @ ${GITHUB_SHA:0:7}"
