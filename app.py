@@ -56,7 +56,7 @@ def _cluster(documents, doc_type, method, label_clusters):
     # Embeddings path reuses the shared encoder; the tfidf path is pure-CPU
     # scikit-learn, so we let the pipeline build it (clusterer=None).
     clusterer = None
-    if method == "embeddings":
+    if method == "Embeddings":
         clusterer = EmbeddingClusterer(
             embedding_model=EMBEDDING_MODEL,
             dist_threshold=None, linkage="ward", metric="euclidean",  # None = adaptive
