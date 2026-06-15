@@ -24,7 +24,6 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # CPU-only torch so the runner doesn't pull a multi-GB CUDA build
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -e .
           pip install -r requirements-dev.txt
@@ -34,3 +33,39 @@ jobs:
 
       - name: Run tests
         run: pytest
+
+  deploy:
+    # waits for the whole test matrix; skipped automatically if any job failed
+    needs: test
+    runs-on: ubuntu-latest
+    # only deploy on a real push to main (never on PRs or other branches)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Hugging Face Hub CLI
+        run: pip install "huggingface_hub>=0.25"
+
+      - name: Assemble the Space's file set
+        run: |
+          rm -rf staging
+          mkdir -p staging/legal_clustering
+          cp app.py Dockerfile requirements.txt staging/
+          cp -r legal_clustering/. staging/legal_clustering/
+          cp README_SPACE.md staging/README.md
+          if [ -f .dockerignore ]; then cp .dockerignore staging/; fi
+
+      - name: Deploy to Hugging Face Space
+        env:
+          # huggingface_hub reads HF_TOKEN from the environment automatically,
+          # so the token never appears in the command line / logs.
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          huggingface-cli upload Calum1888/DocumentClusterer ./staging . \
+            --repo-type=space \
+            --commit-message "Deploy from GitHub @ ${GITHUB_SHA:0:7}"
