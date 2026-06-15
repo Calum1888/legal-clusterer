@@ -4,9 +4,7 @@
 
 **🔗 Live demo:** [Document Clusterer on Hugging Face Spaces](https://huggingface.co/spaces/Calum1888/DocumentClusterer) — upload a `.zip` of documents and cluster them with either method, in the browser.
 
-A comparative study of two unsupervised clustering pipelines for legal contracts, evaluated on the [CUAD](https://www.atticusprojectai.org/cuad) dataset (510 commercial contracts across 25 contract types). It benchmarks a **classical TF-IDF + LSA** pipeline against modern **sentence-transformer embeddings**, evaluates both with internal *and* external metrics, and uses a small open-source LLM to automatically label and verify the resulting clusters — with no cloud API required.
-
-The headline result reproduces a well-known pattern in the clustering literature: **geometric quality metrics favour the classical pipeline; ground-truth-aligned metrics favour the neural one.** This README explains why, and what that means for choosing between the two in practice.
+A comparison of two unsupervised clustering pipelines for documents, evaluated on a selection of files STATE TYPES OF FILES. It compares a **classical TF-IDF + LSA** pipeline against a modern **sentence-transformer embeddings** and uses a small open-source LLM to automatically label and verify the resulting clusters. This projected was inspired by work experience at A&O Shearman in their data science department. 
 
 The project is packaged, tested, and continuously deployed: a `pytest` suite runs in GitHub Actions across Python 3.10–3.12 on every push, and a green push to `main` automatically deploys the Dockerised demo to Hugging Face Spaces.
 
