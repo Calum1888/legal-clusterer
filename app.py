@@ -68,7 +68,7 @@ def _cluster(documents, doc_type, method, label_clusters):
     if label_clusters:
         llm = LLMEvaluation(
             llm_model=LLM_MODEL, max_tokens=50, token_price=0.0, n_llm_samples=3,
-            prompt_type_of_doc=doc_type, seed=42, batch_size=8,
+            prompt_type_of_doc=doc_type, seed=42, batch_size=4,
             min_cluster_size=2, excerpt_chars=500,
             hf_llm=_LLM_PIPE, tokenizer=_TOKENIZER,   # inject pre-loaded model
         )

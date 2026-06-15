@@ -156,7 +156,7 @@ def cluster_documents(
                 llm_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
                 max_tokens=50, token_price=0.0, n_llm_samples=3,
                 prompt_type_of_doc=doc_type, seed=random_state,
-                batch_size=8, min_cluster_size=2, excerpt_chars=500,
+                batch_size=4, min_cluster_size=2, excerpt_chars=500,
             )
         if progress is not None:
             progress(0.5, desc="Labelling clusters…")
