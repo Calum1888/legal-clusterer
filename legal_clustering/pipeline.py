@@ -57,19 +57,19 @@ class ClusteringResult:
 
 def _build_clusterer(method: str, random_state: int):
     """Construct a clusterer with the project's tuned defaults."""
-    if method == "embeddings":
+    if method == "Embeddings":
         return EmbeddingClusterer(
             embedding_model="sentence-transformers/all-mpnet-base-v2",
             dist_threshold=None, linkage="ward", metric="euclidean",   # None = adaptive
             max_chars=2000, batch_size=32, random_state=random_state,
         )
-    if method == "tfidf":
+    if method == "TF-IDF":
         return DocumentClusterer(
             ngram=(1, 2), n_components=200, n_iter=10,
             dist_threshold=None, linkage="ward", metric="euclidean",   # None = adaptive
             input_type="content", random_state=random_state,
         )
-    raise ValueError(f"method must be 'embeddings' or 'tfidf', got {method!r}")
+    raise ValueError(f"method must be 'Embeddings' or 'TF-IDF', got {method!r}")
 
 
 def _fit_or_explain(clusterer, documents: dict) -> dict:
@@ -95,7 +95,7 @@ def _fit_or_explain(clusterer, documents: dict) -> dict:
 def cluster_documents(
     documents: dict[str, str],
     doc_type: str = "documents",
-    method: str = "embeddings",
+    method: str = "Embeddings",
     label_clusters: bool = True,
     *,
     clusterer=None,
