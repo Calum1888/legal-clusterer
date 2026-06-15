@@ -1,10 +1,12 @@
-# Legal Document Clustering: Classical vs Neural Approaches
+# Document Clustering: Classical vs Embedding Approaches
 
 ![CI](https://github.com/Calum1888/legal-clusterer/actions/workflows/ci.yml/badge.svg)
 
 **🔗 Live demo:** [Document Clusterer on Hugging Face Spaces](https://huggingface.co/spaces/Calum1888/DocumentClusterer) — upload a `.zip` of documents and cluster them with either method, in the browser.
 
-A comparison of two unsupervised clustering pipelines for documents, evaluated on a selection of files STATE TYPES OF FILES. It compares a **classical TF-IDF + LSA** pipeline against a modern **sentence-transformer embeddings** and uses a small open-source LLM to automatically label and verify the resulting clusters. This projected was inspired by work experience at A&O Shearman in their data science department. 
+A comparison of two unsupervised clustering pipelines for documents, evaluated on a selection of files STATE TYPES OF FILES. It compares a **classical TF-IDF + LSA** pipeline against a modern **sentence-transformer embeddings** and uses a small open-source LLM to automatically label and verify the resulting clusters. This projected was inspired by work experience at interbational law firm A&O Shearman in their data science department. 
+
+The idea behind the project is to take a large collection of documents and returns clusters where the documents in each cluster are similar or related in some way. This has a wide application to many business cases such as grouping legal contracts in a ligigation case or organising employee files for HR departments.
 
 The project is packaged, tested, and continuously deployed: a `pytest` suite runs in GitHub Actions across Python 3.10–3.12 on every push, and a green push to `main` automatically deploys the Dockerised demo to Hugging Face Spaces.
 
@@ -22,18 +24,16 @@ The project is packaged, tested, and continuously deployed: a `pytest` suite run
 
 ![TF-IDF vs Embeddings on the same upload](docs/screenshot-comparison.png)
 
-*The same upload clustered with TF-IDF (keyword-based) and embeddings (semantic): the neural method separates themes more cleanly, with a higher external-metric score.*
+*The same upload clustered with TF-IDF (keyword-based) and embeddings (semantic): the neural method separates themes more cleanly.*
 
-**Interpretation.** Internal metrics (Silhouette, Davies-Bouldin) measure only geometric cluster shape — tightness and separation in vector space. TF-IDF + LSA wins these because Truncated SVD produces a low-dimensional space whose dominant axes are precisely the ones used for clustering, so clusters look clean *by construction*. External metrics (ARI, AMI, V-measure) compare against ground-truth contract types; embeddings win these consistently, indicating that the embedding clusters — though geometrically messier — better match the categories a domain expert would recognise.
-
-The silhouette gap in particular (0.35 vs 0.11) is largely an artefact of distance concentration in high-dimensional dense spaces, not evidence that the TF-IDF clusters are three times better. That is exactly why both internal and external metrics are reported rather than a single headline number.
+**Interpretation.** 
 
 ---
 
 ## Pipeline
 
 ```
-              Documents
+            Documents
                  |
         +--------+--------+
         v                 v
@@ -100,7 +100,6 @@ legal-clusterer/
 │   ├── validation.py            # corpus guards (CorpusError)
 │   └── pipeline.py              # single entry point: cluster_documents()
 ├── tests/                       # pytest suite
-├── data/                        # CUAD evaluation data
 ├── app.py                       # Gradio demo (deployed to the Space)
 ├── Dockerfile                   # CPU-only container for the Space
 ├── README_SPACE.md              # the Space's README (deployed automatically)
@@ -167,9 +166,7 @@ pytest
 
 Listed here because being upfront about limitations is itself a signal of methodological maturity.
 
-- **Document truncation.** The embedding pipeline sees only the first ~2000 characters of each contract (the model's 512-token limit). For CUAD this works because contract preambles usually identify the type, but it means clustering on openings, not full content. A chunk-and-pool strategy would address this.
-- **Silhouette is biased against high-dimensional dense embeddings.** Distance concentration makes the metric pessimistic in 768-dim spaces, which is why external metrics are the primary evaluation here.
-- **Class imbalance in CUAD.** A few contract types dominate; global-threshold clustering cannot easily carve out very small clusters without fragmenting the large ones, capping achievable V-measure.
+- **Document truncation.** The embedding pipeline sees only the first ~2000 characters of each contract (the model's 512-token limit). 
 - **LLM verification is prompt-sensitive.** The current verification prompt arguably primes a YES by stating the algorithm grouped the documents together. A bias-aware version would present the documents and candidate label independently and ask whether the label fits.
 - **Hierarchical clustering scales poorly** — O(n^2 log n) in time and memory. Appropriate for low-thousands of documents; larger corpora would need MiniBatch K-Means, HDBSCAN, or HNSW-based approximate methods.
 
