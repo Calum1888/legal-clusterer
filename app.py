@@ -60,14 +60,14 @@ def _cluster(documents, doc_type, method, label_clusters):
         clusterer = EmbeddingClusterer(
             embedding_model=EMBEDDING_MODEL,
             dist_threshold=None, linkage="ward", metric="euclidean",  # None = adaptive
-            max_chars=2000, batch_size=32, random_state=42,
+            max_chars=2500, batch_size=32, random_state=42,
             encoder=_ENCODER,                        # inject pre-loaded model
         )
 
     llm = None
     if label_clusters:
         llm = LLMEvaluation(
-            llm_model=LLM_MODEL, max_tokens=50, token_price=0.0, n_llm_samples=3,
+            llm_model=LLM_MODEL, max_tokens=20, token_price=0.0, n_llm_samples=2,
             prompt_type_of_doc=doc_type, seed=42, batch_size=4,
             min_cluster_size=2, excerpt_chars=500,
             hf_llm=_LLM_PIPE, tokenizer=_TOKENIZER,   # inject pre-loaded model
@@ -87,7 +87,7 @@ def _render(result) -> str:
     blocks = [head]
     for c in result.clusters:
         if c.label is None:
-            title = f"**Cluster {c.cluster_id}** \u00b7 {c.size} doc(s) \u00b7 *too small to label*"
+            title = f"**Cluster {c.cluster_id}** \u00b7 {c.size} doc(s)"
         else:
             badge = "\u2713 verified" if c.verified else "\u2717 not verified"
             title = f"**{c.label}** \u00b7 {c.size} doc(s) \u00b7 {badge}"
