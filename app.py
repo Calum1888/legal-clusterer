@@ -83,7 +83,6 @@ def _render(result) -> str:
     """Turn a ClusteringResult into Markdown for the UI."""
     head = (
         f"### {result.n_documents} documents \u2192 {result.n_clusters} clusters\n"
-        f"*silhouette {result.silhouette:.3f} \u00b7 method: {result.method}*\n"
     )
     blocks = [head]
     for c in result.clusters:
@@ -124,8 +123,7 @@ def handle(file_path, doc_type, method, label_clusters, progress=gr.Progress()):
 with gr.Blocks(title="Document Clusterer") as demo:
     gr.Markdown(
         "# Document Clusterer\n"
-        "Upload a **.zip** of documents (`.txt`, `.md`, `.pdf`, `.docx`) and get "
-        "them grouped into labelled clusters \u2014 no cloud API, all local models."
+        "Upload a **.zip** of documents (`.txt`, `.md`, `.pdf`, `.docx`). They can be clustered with 2 different methods with LLM labelling."
     )
     with gr.Row():
         with gr.Column(scale=1):
@@ -133,11 +131,11 @@ with gr.Blocks(title="Document Clusterer") as demo:
             doc_type = gr.Textbox(
                 label="What kind of documents are these?",
                 placeholder="e.g. legal contracts, support tickets, news articles",
-                value="documents",
+                value="",
             )
             method = gr.Radio(
-                ["embeddings", "tfidf"], value="embeddings", label="Method",
-                info="embeddings = semantic (slower); tfidf = keyword-based (faster)",
+                ["Embeddings", "TF-IDF"], value="Embeddings", label="Method",
+                info="Embeddings = semantic (slower); TF-IDF = keyword-based (faster)",
             )
             label = gr.Checkbox(value=True, label="Generate cluster labels (uses the LLM)")
             run = gr.Button("Cluster", variant="primary")
