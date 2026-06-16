@@ -97,13 +97,14 @@ def cluster_documents(
     doc_type: str = "documents",
     method: str = "Embeddings",
     label_clusters: bool = True,
+    verify_labels: bool = False,
     *,
     clusterer=None,
     llm=None,
     random_state: int = 42,
     min_documents: int = MIN_DOCUMENTS,
     max_documents: int = MAX_DOCUMENTS,
-    progress = None
+    progress=None,
 ) -> ClusteringResult:
     """
     Cluster a collection of documents and (optionally) label each cluster.
@@ -114,14 +115,19 @@ def cluster_documents(
         doc_type: Human-readable description of the documents (e.g. "legal
             contracts", "support tickets"). Fed to the LLM prompts so labels
             are domain-appropriate. This is the configurable doc-type hook.
-        method: "embeddings" (sentence-transformer, default) or "tfidf".
+        method: "Embeddings" (sentence-transformer, default) or "TF-IDF".
         label_clusters: If False, skip the LLM entirely and return clusters
             with no labels — fast, and useful for tests that shouldn't download
             a model.
+        verify_labels: If True, run a second LLM pass that checks whether each
+            cluster's documents fit its generated label. Off by default because
+            it doubles the LLM work; when off, every cluster's `verified` is
+            None and the UI shows the label with no verification badge.
         clusterer: Optional pre-built clusterer (dependency injection for
             tests). If None, one is built from `method` with tuned defaults.
         llm: Optional pre-built LLMEvaluation (dependency injection for tests).
-            If None and label_clusters is True, one is built with TinyLlama.
+            If None and label_clusters is True, one is built with the default
+            model.
         random_state: Seed passed through to the clusterer.
         min_documents: Reject corpora smaller than this (see validation).
         max_documents: Reject corpora larger than this (see validation).
@@ -153,8 +159,8 @@ def cluster_documents(
     if label_clusters:
         if llm is None:
             llm = LLMEvaluation(
-                llm_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-                max_tokens=20, token_price=0.0, n_llm_samples=2,
+                llm_model="Qwen/Qwen2.5-1.5B-Instruct",
+                max_tokens=20, token_price=0.0, n_llm_samples=1,
                 prompt_type_of_doc=doc_type, seed=random_state,
                 batch_size=4, min_cluster_size=2, excerpt_chars=500,
             )
@@ -162,10 +168,12 @@ def cluster_documents(
             progress(0.5, desc="Labelling clusters…")
         labels = llm.llm_label(id_to_cluster, documents, progress=progress)
 
-        if progress is not None:
-            progress(0.8, desc="Verifying labels…")
-        verdicts = llm.evaluate_all(labels, id_to_cluster, documents, progress=progress)
-        verdicts_by_cluster = {v["cluster_id"]: v for v in verdicts}
+        # Verification is the expensive second pass; only run it when asked.
+        if verify_labels:
+            if progress is not None:
+                progress(0.8, desc="Verifying labels…")
+            verdicts = llm.evaluate_all(labels, id_to_cluster, documents, progress=progress)
+            verdicts_by_cluster = {v["cluster_id"]: v for v in verdicts}
 
     clusters: list[Cluster] = []
     for cid in sorted(members_by_cluster):
