@@ -50,29 +50,13 @@ class LLMEvaluation:
         """
         Initialise the tokenizer and Hugging Face text-generation pipeline.
 
-        Loads the tokenizer and model specified by self.llm_model and configures
-        a text-generation pipeline for deterministic (greedy) decoding. The model
-        is placed on available devices automatically via device_map="auto", which
-        will use GPU if available and fall back to CPU otherwise.
+        Greedy decoding (do_sample=False) is used so label generation and
+        verification are reproducible across runs without seed management.
 
-        Greedy decoding (do_sample=False) is used so that label generation and
-        cluster verification are fully reproducible across runs without needing
-        to manage random seeds for the model.
-
-        Configures the tokenizer for batched generation:
-            - Sets pad_token to eos_token if missing (required by many decoder-only
-              models like TinyLlama and Llama, which don't ship with a pad token).
-            - Sets padding_side="left" because decoder-only models generate from
-              the right end of the input; right-padding would cause them to
-              continue from pad tokens and produce garbage.
-
-        Side effects:
-            Sets self._tokenizer to the loaded AutoTokenizer instance.
-            Sets self._hf_llm to the configured text-generation pipeline.
-
-        Note:
-            This method is called from __init__, so constructing an LLMEvaluation
-            instance will download the model on first use and load it into memory.
+        Tokenizer is configured for batched generation: pad_token falls back to
+        eos_token if missing, and padding_side="left" because decoder-only models
+        generate from the right end of the input (right-padding would make them
+        continue from pad tokens and produce garbage).
         """
         self._tokenizer = AutoTokenizer.from_pretrained(self.llm_model)
 
@@ -92,6 +76,20 @@ class LLMEvaluation:
             do_sample=False,
         )
 
+    def _format_chat(self, user_content: str) -> str:
+        """
+        Wrap an instruction in the model's chat template so a *chat* model runs
+        in instruct mode and actually follows the instruction. Falls back to the
+        raw text if the tokenizer has no chat template (e.g. a base model).
+        """
+        if getattr(self._tokenizer, "chat_template", None):
+            return self._tokenizer.apply_chat_template(
+                [{"role": "user", "content": user_content}],
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+        return user_content
+
     def count_price_tokens(self, prompt: str) -> dict:
         """
         Return the token count and cost of a single prompt.
@@ -104,62 +102,93 @@ class LLMEvaluation:
             "price": num_tokens * self.token_price,
         }
 
+    def _excerpts(self, sample_ids: list, documents: dict) -> str:
+        """
+        Build the content block for a prompt.
+
+        Uses neutral "Document N" headers and the document *content only* — the
+        filename / doc_id is deliberately NOT included, because a small model
+        will otherwise just echo the filename back as the label.
+        """
+        blocks = [
+            f"Document {i}:\n{documents.get(doc_id, '')[:self.excerpt_chars].strip()}"
+            for i, doc_id in enumerate(sample_ids, 1)
+        ]
+        return "\n\n".join(blocks)
+
     def _build_label_prompt(self, sample_ids: list, documents: dict) -> str:
         """
-        Construct a prompt asking the LLM to label a cluster.
+        Construct a prompt asking the LLM to name the common theme of a cluster.
 
-        Args:
-            sample_ids (list): A list of sampled document ids from a clsuter.
-            documents (dict): Collection of documents.
-        
-        Returns:
-            str: A prompt used to label each cluster.
+        Content only (no filenames), with explicit rules and a one-shot example
+        so a small model returns a short category rather than a copied title.
         """
-        # have a doc_id header between documents
-        # strip the first N characters from the document to be used as context in LLM 
-        excerpts = [
-            f"--- {doc_id} ---\n{documents.get(doc_id, '')[:self.excerpt_chars].strip()}"
-            for doc_id in sample_ids
-        ]
-        # returns the full prompt
-        return (
-            f"These {self.prompt_type_of_doc} were grouped together by a "
-            "clustering algorithm:\n\n"
-            + "\n\n".join(excerpts)
-            + f"\n\nRespond with only a short 3-5 word label describing "
-            f"what {self.prompt_type_of_doc} these are. No explanation."
+        instruction = (
+            f"Below are excerpts from several {self.prompt_type_of_doc} that a "
+            "clustering algorithm placed in the same group. Identify the common "
+            "theme and give a short category name for the group.\n\n"
+            "Rules:\n"
+            "- 2 to 4 words.\n"
+            "- Describe the shared topic, not any single document.\n"
+            "- Do NOT use file names, document titles, or document numbers.\n"
+            "- Reply with the category name only, nothing else.\n\n"
+            "Example reply: Employment Contracts\n\n"
+            f"{self._excerpts(sample_ids, documents)}\n\n"
+            "Category name:"
         )
+        return self._format_chat(instruction)
 
     def _build_verification_prompt(
         self, cluster_label: str, sample_ids: list, documents: dict) -> str:
         """
-        Construct a prompt asking the LLM to verify a cluster's label.
+        Construct a prompt asking whether the documents fit the candidate label.
 
-        Args:
-            cluster_label (str): The LLM-generated label for a sepcific cluster.
-            sample_ids (list): A list of sampled document ids from a clsuter.
-            documents (dict): Collection of documents.
-        
-        Returns:
-            str: A prompt to verify if the LLM-label is accurate to the content of the documents.
+        Phrased to reduce the YES-priming bias (it does not assert that an
+        algorithm already decided they belong together) and to force a clean
+        one-word verdict that can be parsed reliably.
         """
-        excerpts = [
-            f"--- {doc_id} ---\n{documents.get(doc_id, '')[:self.excerpt_chars].strip()}"
-            for doc_id in sample_ids
-        ]
-        return (
-            f"A clustering algorithm grouped these {self.prompt_type_of_doc} together "
-            f'and labelled the cluster: "{cluster_label}".\n\n'
-            + "\n\n".join(excerpts)
-            + f"\n\nDo these {self.prompt_type_of_doc} all belong to the same type? "
-            "Reply with YES or NO on the first line, then a one sentence explanation."
+        instruction = (
+            f"Here are excerpts from several {self.prompt_type_of_doc}:\n\n"
+            f"{self._excerpts(sample_ids, documents)}\n\n"
+            f'Do all of these documents fit the category "{cluster_label}"?\n'
+            "Answer with exactly one word on the first line: YES or NO.\n"
+            "Then, on a new line, give a one-sentence reason."
         )
-    
+        return self._format_chat(instruction)
+
+    @staticmethod
+    def _parse_verdict(raw_verdict: str) -> bool:
+        """
+        Parse a verification reply into a pass/fail bool. Looks at the first
+        word of the first non-empty line and checks whether it is YES.
+        """
+        for line in (raw_verdict or "").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            first = line.upper().replace(".", " ").replace(",", " ").split()
+            return bool(first) and first[0].startswith("YES")
+        return False
+
+    @staticmethod
+    def _clean_label(text: str) -> str:
+        """
+        Tidy a generated label: first line only, strip quotes and any echoed
+        "Category name:" prefix, and cap length as a safety net.
+        """
+        text = (text or "").strip()
+        if text:
+            text = text.splitlines()[0].strip().strip('"').strip("'")
+        for prefix in ("Category name:", "Category:", "Label:"):
+            if text.lower().startswith(prefix.lower()):
+                text = text[len(prefix):].strip().strip('"').strip("'")
+        return " ".join(text.split()[:8])
+
     def _batched_generate(self, prompts: list, desc: str, progress=None) -> list:
         '''
-        Batches prompts together for the LLM to run over in parallel to speed up analysis.
+        Batches prompts together for the LLM to run over in parallel.
 
-        A progress bar is shown: gr.Progress in the browser when `progress` is
+        Shows a progress bar: gr.Progress in the browser when `progress` is
         supplied (Gradio), otherwise a tqdm bar in the terminal.
 
         Args:
@@ -187,23 +216,16 @@ class LLMEvaluation:
         self,
         id_and_label: dict,
         documents: dict,
-        progress = None) -> dict:
+        progress=None) -> dict:
         """
         Generate a short descriptive label for each cluster using the LLM.
 
         Prompts for all eligible clusters are built up front, then sent to the
-        pipeline in batches (size controlled by self.batch_size) for efficient
-        GPU utilisation.
+        pipeline in batches (size controlled by self.batch_size).
 
         Args:
             id_and_label: Mapping of doc_id -> cluster label (output of clusterer.fit).
-            documents: Mapping of doc_id -> raw document text. Used to give the LLM
-                actual content rather than just identifiers.
-            excerpt_chars: Number of characters of each sampled document to include
-                in the prompt. Keep small enough that n_llm_samples * excerpt_chars
-                fits comfortably in the model's context window.
-            min_cluster_size: Clusters smaller than this are skipped (singletons or
-                tiny clusters can't be meaningfully labelled).
+            documents: Mapping of doc_id -> raw document text.
 
         Returns:
             Mapping of cluster_id -> generated label string.
@@ -213,7 +235,7 @@ class LLMEvaluation:
         for doc_id, label in id_and_label.items():
             clusters.setdefault(int(label), []).append(doc_id)
 
-        # kkip clusters too small to label meaningfully.
+        # skip clusters too small to label meaningfully.
         clusters = {cid: ids for cid, ids in clusters.items() if len(ids) >= self.min_cluster_size}
 
         # single RNG, seeded once — no global state pollution, samples vary per cluster.
@@ -227,17 +249,13 @@ class LLMEvaluation:
             cluster_ids.append(cluster_id)
             prompts.append(self._build_label_prompt(sample_ids, documents))
 
-        # batched generation. return_full_text=False yields only the continuation,
-        # avoiding fragile prompt-stripping logic.
+        # batched generation. return_full_text=False yields only the continuation.
         outputs = self._batched_generate(prompts, desc="Labelling clusters", progress=progress)
 
         # zip outputs back to cluster IDs and clean up the labels.
         generated_cluster_labels = {}
         for cluster_id, out in zip(cluster_ids, outputs):
-            text = out[0]["generated_text"].strip()
-            # hard cap on label length in case the model ignores the instruction.
-            label = " ".join(text.split()[:8])
-            generated_cluster_labels[cluster_id] = label
+            generated_cluster_labels[cluster_id] = self._clean_label(out[0]["generated_text"])
 
         return generated_cluster_labels
 
@@ -251,15 +269,7 @@ class LLMEvaluation:
         Verify a single cluster: ask the LLM whether its documents genuinely
         belong together under the generated label.
 
-        For evaluating many clusters efficiently, use evaluate_all instead —
-        it batches all verification prompts together.
-
-        Args:
-            cluster_id: The cluster to check.
-            generated_labels: Mapping of cluster_id -> label (output of llm_label).
-            id_and_label: Mapping of doc_id -> cluster label.
-            documents: Mapping of doc_id -> raw document text.
-            excerpt_chars: Characters of each document to include in the prompt.
+        For evaluating many clusters efficiently, use evaluate_all instead.
 
         Returns:
             dict with cluster_id, label, raw verdict text, and a parsed bool `passed`.
@@ -277,12 +287,11 @@ class LLMEvaluation:
         prompt = self._build_verification_prompt(cluster_label, sample_ids, documents)
         raw_verdict = self._hf_llm(prompt, return_full_text=False)[0]["generated_text"].strip()
 
-        first_token = raw_verdict.split()[0].upper().strip(".,:;") if raw_verdict else ""
         return {
             "cluster_id": cluster_id,
             "label": cluster_label,
             "verdict": raw_verdict,
-            "passed": first_token.startswith("YES"),
+            "passed": self._parse_verdict(raw_verdict),
         }
 
     def evaluate_all(
@@ -290,16 +299,10 @@ class LLMEvaluation:
         generated_labels: dict,
         id_and_label: dict,
         documents: dict,
-        progress = None) -> list:
+        progress=None) -> list:
         """
         Run cluster verification over every labelled cluster, batching prompts
         through the LLM for speed.
-
-        Args:
-            generated_labels: Mapping of cluster_id -> label (output of llm_label).
-            id_and_label: Mapping of doc_id -> cluster label.
-            documents: Mapping of doc_id -> raw document text.
-            excerpt_chars: Characters of each document to include in the prompt.
 
         Returns:
             List of dicts (one per cluster), each with cluster_id, label,
@@ -307,7 +310,7 @@ class LLMEvaluation:
         """
         rng = random.Random(self.seed)
 
-        # Build all verification prompts up front so they can be batched.
+        # build all verification prompts up front so they can be batched.
         cluster_ids = []
         cluster_labels = []
         prompts = []
@@ -323,18 +326,17 @@ class LLMEvaluation:
             prompts.append(self._build_verification_prompt(
                 cluster_label, sample_ids, documents))
 
-        # Batched generation across all clusters.
+        # batched generation across all clusters.
         outputs = self._batched_generate(prompts, desc="Verifying clusters", progress=progress)
 
         results = []
         for cluster_id, cluster_label, out in zip(cluster_ids, cluster_labels, outputs):
             raw_verdict = out[0]["generated_text"].strip()
-            first_token = raw_verdict.split()[0].upper().strip(".,:;") if raw_verdict else ""
             results.append({
                 "cluster_id": cluster_id,
                 "label": cluster_label,
                 "verdict": raw_verdict,
-                "passed": first_token.startswith("YES"),
+                "passed": self._parse_verdict(raw_verdict),
             })
 
         return results
