@@ -4,7 +4,7 @@
 
 **🔗 Live demo:** [Document Clusterer on Hugging Face Spaces](https://huggingface.co/spaces/Calum1888/DocumentClusterer) — upload a `.zip` of documents and cluster them with either method, in the browser.
 
-A comparison of two unsupervised clustering pipelines for documents, evaluated on a selection of files. These files include PDFs of UK court rulings on the oil industry, academic papers related to my masters thesis and chapters from classic literature. It compares a **classical TF-IDF + LSA** pipeline against a modern **sentence-transformer embeddings** and uses a small open-source LLM to automatically label and verify the resulting clusters. This projected was inspired by work experience at interbational law firm A&O Shearman in their data science department. 
+A comparison of two unsupervised clustering pipelines for documents, evaluated on a selection of files. These files include PDFs of UK court rulings on the oil industry, academic papers related to my masters thesis and historical articles. It compares a **classical TF-IDF + LSA** pipeline against a modern **sentence-transformer embeddings** and uses a small open-source LLM to automatically label and verify the resulting clusters. This projected was inspired by work experience at interbational law firm A&O Shearman in their data science department. 
 
 The idea behind the project is to take a large collection of documents and returns clusters where the documents in each cluster are similar or related in some way. This has a wide application to many business cases such as grouping legal contracts in a ligigation case or organising employee files for HR departments.
 
