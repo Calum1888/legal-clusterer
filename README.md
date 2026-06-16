@@ -16,17 +16,16 @@ The project is packaged, tested, and continuously deployed: a `pytest` suite run
 
 ---
 
-![Document Clusterer — app interface](docs/screenshot-app.png)
+![Document Clusterer — app interface](images/demo_page.png)
 
 *Upload a zip of documents, pick a method, and the app returns labelled clusters in the browser.*
 
 ---
 
-![TF-IDF vs Embeddings on the same upload](docs/screenshot-comparison.png)
+![Embeddings method with LLM labelling](images/embeddings_and_labels.png)
+![TF-IDF method with LLM labelling](images/tfidf_and_labels.png)
 
-*The same upload clustered with TF-IDF (keyword-based) and embeddings (semantic): the neural method separates themes more cleanly.*
-
-**Interpretation.** 
+*The same upload clustered with TF-IDF (keyword-based) and embeddings (semantic).*
 
 ---
 
