@@ -100,6 +100,7 @@ legal-clusterer/
 │   └── pipeline.py              # single entry point: cluster_documents()
 ├── tests/                       # pytest suite
 ├── data/                        # example files to cluster
+├── images/                      # examples of the clusterers use
 ├── app.py                       # Gradio demo (deployed to the Space)
 ├── Dockerfile                   # CPU-only container for the Space
 ├── README_SPACE.md              # the Space's README (deployed automatically)
