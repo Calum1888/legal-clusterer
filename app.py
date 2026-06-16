@@ -18,7 +18,7 @@ from legal_clustering.llm_evaluation import LLMEvaluation
 
 
 EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
-LLM_MODEL = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+LLM_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
 
 # CPU-only deployment. These guards still resolve correctly if the same file is
 # ever run on a GPU box, but on this Space they select CPU.

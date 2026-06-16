@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # starts (no download on first boot). Downloads into HF_HOME, owned by `user`.
 RUN python -c "from huggingface_hub import snapshot_download; \
 snapshot_download('sentence-transformers/all-mpnet-base-v2'); \
-snapshot_download('TinyLlama/TinyLlama-1.1B-Chat-v1.0')"
+snapshot_download('Qwen/Qwen2.5-1.5B-Instruct')"
 
 COPY --chown=user . .
 
