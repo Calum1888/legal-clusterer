@@ -91,7 +91,7 @@ class EmbeddingClusterer:
         Each document is truncated to self.max_chars before encoding to stay
         within the model's context window. Embeddings are L2-normalised, so
         Euclidean distance on the output is monotonically related to cosine
-        distance — ward + euclidean linkage works cleanly.
+        distance, ward + euclidean linkage works cleanly.
 
         Args:
             documents (dict): Mapping of doc_id -> raw document text.
